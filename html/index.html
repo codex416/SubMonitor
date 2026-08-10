@@ -1077,7 +1077,7 @@
             const typeLabel = type === 'ip' ? 'IP' : 'Token';
             if (!confirm(`确定要封禁该 ${typeLabel} 吗？\n${value}`)) return;
 
-            fetch('/api/action', {
+            fetch('/api/action.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'ban', type: type, value: value })
@@ -1158,7 +1158,7 @@
 
         async function fetchData() {
             try {
-                const res = await fetch('/api/logs');
+                const res = await fetch('/api/logs.php');
                 allLogs = await res.json();
                 
                 const now = new Date();
