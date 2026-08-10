@@ -26,7 +26,7 @@ services:
       - log-data:/var/log/nginx
     depends_on:
       - php
-    command: >
+    command: |
       /bin/sh -c "
       apk add --no-cache curl openssl socat >/dev/null 2>&1
       if [ ! -f /root/.acme.sh/acme.sh ]; then
@@ -35,12 +35,12 @@ services:
       fi
       (while true; do
         if [ -f /etc/nginx/rules/.cert_flag ]; then
-          DOMAIN=\$$(cat /etc/nginx/rules/.cert_flag)
+          DOMAIN=$$(cat /etc/nginx/rules/.cert_flag)
           rm -f /etc/nginx/rules/.cert_flag
-          echo '{\"status\":\"processing\",\"msg\":\"正在向 Let\'s Encrypt 申请证书，请稍候...\"}' > /etc/nginx/rules/cert_status.json
-          /root/.acme.sh/acme.sh --issue -d \$$DOMAIN -w /var/www/html --accountemail admin@befriends.wiki --force
-          if [ \$$? -eq 0 ]; then
-            /root/.acme.sh/acme.sh --install-cert -d \$$DOMAIN \
+          echo '{\"status\":\"processing\",\"msg\":\"正在向 Let’s Encrypt 申请证书，请稍候...\"}' > /etc/nginx/rules/cert_status.json
+          /root/.acme.sh/acme.sh --issue -d $$DOMAIN -w /var/www/html --accountemail admin@befriends.wiki --force
+          if [ $$? -eq 0 ]; then
+            /root/.acme.sh/acme.sh --install-cert -d $$DOMAIN \
               --key-file /etc/nginx/ssl/key.pem \
               --fullchain-file /etc/nginx/ssl/cert.pem
             nginx -s reload
