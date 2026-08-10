@@ -23,6 +23,17 @@ services:
       - log-data:/var/log/nginx
     depends_on:
       - php
+    command: >
+      /bin/sh -c "
+      (while true; do
+        if [ -f /etc/nginx/rules/.reload_flag ]; then
+          rm -f /etc/nginx/rules/.reload_flag
+          nginx -s reload
+        fi
+        sleep 2
+      done) &
+      exec nginx -g 'daemon off;'
+      "
 
 volumes:
   log-data:
