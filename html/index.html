@@ -829,6 +829,14 @@
                     <button class="btn btn-quick" onclick="setQuickDays(7)">近7天</button>
                 </div>
             </div>
+            <!-- 域名修改与证书申请组件 -->
+            <div class="control-row">
+                <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
+                <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
+            </div>
+            <div id="cert-status-box" style="display:none; width:100%; font-size:0.78rem; padding:8px 12px; background:#f0f6ff; border:1px solid #bfdbfe; border-radius:8px; color:#1e40af; font-family:monospace; word-break:break-all;">
+                等待提交申请...
+            </div>
         </div>
 
         <div class="table-card">
@@ -940,6 +948,36 @@
         let activeBlTab = 'ip';
 
         function padZero(n) { return n.toString().padStart(2, '0'); }
+
+        async function submitDomainCert() {
+            const domainInput = document.getElementById('domain-input');
+            const statusBox = document.getElementById('cert-status-box');
+            const domain = domainInput.value.trim();
+
+            if (!domain) {
+                showToast('请输入有效的域名');
+                return;
+            }
+
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = '⏱️ 正在提交域名配置，并向 ACME/Let\'s Encrypt 申请 SSL 证书，请稍候...';
+
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'apply_cert', domain: domain })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    statusBox.innerHTML = `✅ 证书申请成功！域名已被修改为: <strong>${escapeHtml(domain)}</strong>`;
+                } else {
+                    statusBox.innerHTML = `❌ 申请失败: ${escapeHtml(data.message || '请检查域名解析与服务配置')}`;
+                }
+            } catch (err) {
+                statusBox.innerHTML = '❌ 请求出错，请检查接口与网络通信';
+            }
+        }
 
         function initTimeSelectOptions() {
             const hourOptions = Array.from({length: 24}, (_, i) => `<option value="${padZero(i)}">${i}时</option>`).join('');
