@@ -15,7 +15,7 @@ services:
     container_name: submonitor-nginx
     restart: always
     ports:
-      - "80:80"     # HTTP 端口（用于 ACME 验证 & 重定向）
+      - "80:80"     # HTTP 端口
       - "443:443"   # HTTPS 加密端口
     volumes:
       - ./html:/var/www/html
