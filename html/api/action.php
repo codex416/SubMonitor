@@ -12,72 +12,131 @@ $tokenFile = $ruleDir . '/token_blacklist.conf';
 $uaFile    = $ruleDir . '/ua_blacklist.conf';
 $flagFile  = $ruleDir . '/.reload_flag';
 
-// 初始化规则文件
+// 确保规则文件存在
 foreach ([$ipFile, $tokenFile, $uaFile] as $f) {
     if (!file_exists($f)) {
         @file_put_contents($f, '');
     }
 }
 
-// 解析请求参数
+// 解析输入数据
 $rawInput = file_get_contents('php://input');
 $jsonData = json_decode($rawInput, true) ?? [];
 
-$action = $_GET['action'] ?? $_POST['action'] ?? $jsonData['action'] ?? '';
-$type   = $_POST['type']   ?? $jsonData['type']   ?? '';
-$value  = trim($_POST['value'] ?? $_POST['target'] ?? $jsonData['value'] ?? $jsonData['target'] ?? '');
+$action = $_REQUEST['action'] ?? $jsonData['action'] ?? '';
+$type   = $_REQUEST['type']   ?? $jsonData['type']   ?? '';
+$value  = trim($_REQUEST['value'] ?? $_REQUEST['target'] ?? $jsonData['value'] ?? $jsonData['target'] ?? '');
 
-if (!$value) {
-    echo json_encode(['status' => 'error', 'message' => '封禁目标不能为空']);
-    exit;
-}
-
-// 适配前端指令
-if ($action === 'ban') {
-    if ($type === 'ip') $action = 'block_ip';
-    elseif ($type === 'token') $action = 'block_token';
-    elseif ($type === 'ua') $action = 'block_ua';
-}
-
-// 辅助函数：生成 reload 标记
 function triggerNginxReload($flagFile) {
     @file_put_contents($flagFile, '1');
 }
 
-// 1. 处理 IP 封禁
-if ($action === 'block_ip') {
-    $line = "deny " . $value . ";\n";
-    if (@file_put_contents($ipFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        triggerNginxReload($flagFile);
-        echo json_encode(['status' => 'success', 'message' => "IP [{$value}] 已封禁，Nginx 已自动重载！"]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => '写入失败，请检查目录权限']);
+// 1. 获取所有当前封禁列表 (IP / Token / UA)
+if ($action === 'list' || $action === 'get_rules') {
+    $ips = [];
+    $tokens = [];
+    $uas = [];
+
+    if (file_exists($ipFile)) {
+        $lines = file($ipFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (preg_match('/deny\s+([^;]+);/i', trim($line), $m)) {
+                $ips[] = trim($m[1]);
+            }
+        }
     }
+
+    if (file_exists($tokenFile)) {
+        $lines = file($tokenFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (preg_match('/\$arg_token\s*=\s*"([^"]+)"/i', trim($line), $m)) {
+                $tokens[] = trim($m[1]);
+            }
+        }
+    }
+
+    if (file_exists($uaFile)) {
+        $lines = file($uaFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
+        foreach ($lines as $line) {
+            if (preg_match('/\$http_user_agent\s*~\*\s*"([^"]+)"/i', trim($line), $m)) {
+                $uas[] = trim($m[1]);
+            }
+        }
+    }
+
+    echo json_encode([
+        'status' => 'success',
+        'data' => [
+            'ip'    => array_values(array_unique($ips)),
+            'token' => array_values(array_unique($tokens)),
+            'ua'    => array_values(array_unique($uas))
+        ]
+    ]);
     exit;
 }
 
-// 2. 处理 Token 封禁
-if ($action === 'block_token') {
-    $line = 'if ($arg_token = "' . $value . '") { return 403; }' . "\n";
-    if (@file_put_contents($tokenFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        triggerNginxReload($flagFile);
-        echo json_encode(['status' => 'success', 'message' => "Token 已封禁，Nginx 已自动重载！"]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => '写入失败，请检查目录权限']);
+// 2. 执行封禁 (支持从日志一键封禁，也支持手动主动作输入添加)
+if ($action === 'ban' || $action === 'block') {
+    if (!$value || !$type) {
+        echo json_encode(['status' => 'error', 'message' => '参数不完整']);
+        exit;
     }
+
+    // 适配旧前端 block_ip / block_token 命名
+    if ($type === 'block_ip') $type = 'ip';
+    if ($type === 'block_token') $type = 'token';
+    if ($type === 'block_ua') $type = 'ua';
+
+    if ($type === 'ip') {
+        $line = "deny " . $value . ";\n";
+        @file_put_contents($ipFile, $line, FILE_APPEND | LOCK_EX);
+    } elseif ($type === 'token') {
+        $line = 'if ($arg_token = "' . $value . '") { return 403; }' . "\n";
+        @file_put_contents($tokenFile, $line, FILE_APPEND | LOCK_EX);
+    } elseif ($type === 'ua') {
+        $line = 'if ($http_user_agent ~* "' . $value . '") { return 403; }' . "\n";
+        @file_put_contents($uaFile, $line, FILE_APPEND | LOCK_EX);
+    } else {
+        echo json_encode(['status' => 'error', 'message' => '不支持的封禁类型']);
+        exit;
+    }
+
+    triggerNginxReload($flagFile);
+    echo json_encode(['status' => 'success', 'message' => "已成功加入封禁名单！"]);
     exit;
 }
 
-// 3. 处理 UA 封禁
-if ($action === 'block_ua') {
-    $line = 'if ($http_user_agent ~* "' . $value . '") { return 403; }' . "\n";
-    if (@file_put_contents($uaFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        triggerNginxReload($flagFile);
-        echo json_encode(['status' => 'success', 'message' => "User-Agent 已封禁，Nginx 已自动重载！"]);
-    } else {
-        echo json_encode(['status' => 'error', 'message' => '写入失败，请检查目录权限']);
+// 3. 执行解封 (移除指定规则)
+if ($action === 'unban' || $action === 'unblock') {
+    if (!$value || !$type) {
+        echo json_encode(['status' => 'error', 'message' => '参数不完整']);
+        exit;
     }
+
+    $targetFile = null;
+    if ($type === 'ip') $targetFile = $ipFile;
+    if ($type === 'token') $targetFile = $tokenFile;
+    if ($type === 'ua') $targetFile = $uaFile;
+
+    if ($targetFile && file_exists($targetFile)) {
+        $lines = file($targetFile, FILE_IGNORE_NEW_LINES);
+        $newLines = [];
+        foreach ($lines as $line) {
+            // 过滤掉包含解封目标的行
+            if (strpos($line, $value) === false && trim($line) !== '') {
+                $newLines[] = $line;
+            }
+        }
+        $content = count($newLines) > 0 ? implode("\n", $newLines) . "\n" : '';
+        file_put_contents($targetFile, $content, LOCK_EX);
+        
+        triggerNginxReload($flagFile);
+        echo json_encode(['status' => 'success', 'message' => "已成功解封！"]);
+        exit;
+    }
+
+    echo json_encode(['status' => 'error', 'message' => '规则文件未找到']);
     exit;
 }
 
-echo json_encode(['status' => 'error', 'message' => '未知的操作指令: ' . $action]);
+echo json_encode(['status' => 'error', 'message' => '未知的操作指令']);
