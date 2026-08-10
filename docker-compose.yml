@@ -46,7 +46,7 @@ services:
             nginx -s reload
             echo '{\"status\":\"success\",\"msg\":\"证书申请并安装成功，已实时生效！\"}' > /etc/nginx/rules/cert_status.json
           else
-            echo '{\"status\":\"error\",\"msg\":\"申请失败！请检查域名解析是否指向本 VPS，且 80 端口已开放。\"}' > /etc/nginx/rules/cert_status.json
+            echo '{\"status\":\"error\",\"msg\":\"申请失败！请检查域名 DNS 是否解析到本 VPS，且 80 端口已开放。\"}' > /etc/nginx/rules/cert_status.json
           fi
         fi
         if [ -f /etc/nginx/rules/.reload_flag ]; then
