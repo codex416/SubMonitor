@@ -1,0 +1,26 @@
+version: '3.8'
+
+services:
+  php:
+    image: php:8.2-fpm-alpine
+    container_name: submonitor-php
+    restart: always
+    volumes:
+      - ./html:/var/www/html
+      - log-data:/var/log/nginx
+
+  nginx:
+    image: nginx:alpine
+    container_name: submonitor-nginx
+    restart: always
+    ports:
+      - "8080:80"
+    volumes:
+      - ./html:/var/www/html
+      - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
+      - log-data:/var/log/nginx
+    depends_on:
+      - php
+
+volumes:
+  log-data:
