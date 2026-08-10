@@ -15,11 +15,13 @@ services:
     container_name: submonitor-nginx
     restart: always
     ports:
-      - "8080:80"
+      - "80:80"     # HTTP 端口（用于 ACME 验证 & 重定向）
+      - "443:443"   # HTTPS 加密端口
     volumes:
       - ./html:/var/www/html
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf:ro
       - ./rules:/etc/nginx/rules
+      - ./ssl:/etc/nginx/ssl
       - log-data:/var/log/nginx
     depends_on:
       - php
