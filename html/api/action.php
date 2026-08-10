@@ -1,26 +1,8 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// 1. 自动探查并定位可写的 rules 目录路径
-$possiblePaths = [
-    __DIR__ . '/../../rules',
-    __DIR__ . '/../rules',
-    '/var/www/html/rules',
-    '/var/www/rules'
-];
-
-$ruleDir = null;
-foreach ($possiblePaths as $path) {
-    $parent = dirname($path);
-    if (is_dir($parent) && is_writable($parent)) {
-        $ruleDir = $path;
-        break;
-    }
-}
-
-if (!$ruleDir) {
-    $ruleDir = __DIR__ . '/../../rules';
-}
+// 1. 根据 docker-compose.yml 的挂载路径，直接指定 /etc/nginx/rules
+$ruleDir = '/etc/nginx/rules';
 
 if (!is_dir($ruleDir)) {
     @mkdir($ruleDir, 0777, true);
@@ -37,7 +19,7 @@ foreach ([$ipFile, $tokenFile, $uaFile] as $f) {
     }
 }
 
-// 2. 兼容解析 POST JSON 与 Form 数据
+// 2. 解析前端 JSON 请求体
 $rawInput = file_get_contents('php://input');
 $jsonData = json_decode($rawInput, true) ?? [];
 
@@ -50,7 +32,7 @@ if (!$value) {
     exit;
 }
 
-// 兼容前端传参 (action: 'ban', type: 'ip'|'token'|'ua')
+// 适配前端 index.html 的 banTarget(type, value) 函数
 if ($action === 'ban') {
     if ($type === 'ip') $action = 'block_ip';
     elseif ($type === 'token') $action = 'block_token';
@@ -61,9 +43,9 @@ if ($action === 'ban') {
 if ($action === 'block_ip') {
     $line = "deny " . $value . ";\n";
     if (@file_put_contents($ipFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        echo json_encode(['status' => 'success', 'message' => "IP [{$value}] 已成功封禁！"]);
+        echo json_encode(['status' => 'success', 'message' => "IP [{$value}] 已成功加入封禁名单！"]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => '写入 IP 规则文件失败，请检查目录权限']);
+        echo json_encode(['status' => 'error', 'message' => '写入失败，请在宿主机执行 chmod -R 777 rules']);
     }
     exit;
 }
@@ -72,9 +54,9 @@ if ($action === 'block_ip') {
 if ($action === 'block_token') {
     $line = 'if ($arg_token = "' . $value . '") { return 403; }' . "\n";
     if (@file_put_contents($tokenFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        echo json_encode(['status' => 'success', 'message' => "Token 已成功封禁！"]);
+        echo json_encode(['status' => 'success', 'message' => "Token 已成功加入封禁名单！"]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => '写入 Token 规则文件失败，请检查目录权限']);
+        echo json_encode(['status' => 'error', 'message' => '写入失败，请在宿主机执行 chmod -R 777 rules']);
     }
     exit;
 }
@@ -83,9 +65,9 @@ if ($action === 'block_token') {
 if ($action === 'block_ua') {
     $line = 'if ($http_user_agent ~* "' . $value . '") { return 403; }' . "\n";
     if (@file_put_contents($uaFile, $line, FILE_APPEND | LOCK_EX) !== false) {
-        echo json_encode(['status' => 'success', 'message' => "User-Agent [{$value}] 已成功封禁！"]);
+        echo json_encode(['status' => 'success', 'message' => "User-Agent [{$value}] 已成功加入封禁名单！"]);
     } else {
-        echo json_encode(['status' => 'error', 'message' => '写入 UA 规则文件失败，请检查目录权限']);
+        echo json_encode(['status' => 'error', 'message' => '写入失败，请在宿主机执行 chmod -R 777 rules']);
     }
     exit;
 }
