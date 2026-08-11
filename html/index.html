@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+[cite: 3]<!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
@@ -63,6 +63,24 @@
             font-weight: 700;
             color: #0f172a;
             letter-spacing: -0.3px;
+        }
+
+        /* 退出按钮样式 */
+        .logout-btn {
+            background: #fef2f2;
+            color: var(--primary-red);
+            border: 1px solid #fecaca;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .logout-btn:hover {
+            background: var(--primary-red);
+            color: #ffffff;
+            border-color: var(--primary-red);
         }
 
         .last-update { font-size: 0.75rem; color: var(--text-muted); }
@@ -758,7 +776,10 @@
                 <span class="status-dot"></span>
                 <span class="brand-title">SubMonitor</span>
             </div>
-            <div class="last-update">最后更新: <span id="update-time">--:--:--</span></div>
+            <div style="display: flex; align-items: center; gap: 12px;">
+                <div class="last-update">最后更新: <span id="update-time">--:--:--</span></div>
+                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+            </div>
         </div>
 
         <div class="stats-grid">
@@ -951,6 +972,35 @@
     <div id="toast" class="toast">已复制到剪贴板</div>
 
     <script>
+        // 【新增】页面加载时优先鉴权：未登录直接拦截回 login.html
+        (async function checkAuthOnLoad() {
+            try {
+                const res = await fetch('/api/check_status.php');
+                const data = await res.json();
+                if (data.code !== 200) {
+                    window.location.href = '/login.html';
+                } else {
+                    initializeApp(); // 鉴权成功后启动原面板逻辑
+                }
+            } catch (e) {
+                window.location.href = '/login.html';
+            }
+        })();
+
+        // 【新增】退出登录逻辑
+        function handleLogout() {
+            if(!confirm('确定要退出当前管理面板吗？')) return;
+            fetch('/api/login.php', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'logout=1'
+            }).then(() => {
+                window.location.href = '/login.html';
+            }).catch(() => {
+                window.location.href = '/login.html';
+            });
+        }
+
         let allLogs = [];
         let lockedStartTime = ''; 
         let lockedEndTime = '';   
@@ -1733,15 +1783,18 @@
             }
         }
 
+        // 【新增】将原先直接执行的初始化逻辑封装进 initializeApp，由鉴权通过后触发
+        function initializeApp() {
+            initTimeSelectOptions();
+            fetchData();
+            fetchUpstreamDomain();
+            checkCertStatus();
+            setInterval(fetchData, 5000);
+        }
+
         window.addEventListener('resize', () => {
             if (allLogs.length > 0) filterTableData();
         });
-
-        initTimeSelectOptions();
-        fetchData();
-        fetchUpstreamDomain();
-        checkCertStatus();
-        setInterval(fetchData, 5000);
     </script>
 </body>
 </html>
