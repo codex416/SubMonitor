@@ -12,16 +12,28 @@ $uaFile     = '/etc/nginx/rules/ua_blacklist.conf';
 $tokenFile  = '/etc/nginx/rules/token_blacklist.conf';
 $reloadFlag = '/etc/nginx/rules/.reload_flag';
 
-// 智能获取 Nginx 配置文件路径（兼容 default.conf 或 default_4.conf）
+// 智能获取 Nginx 配置文件路径
 function getNginxConfPath() {
     $confFiles = glob('/etc/nginx/conf.d/*.conf');
     return !empty($confFiles) ? $confFiles[0] : '/etc/nginx/conf.d/default.conf';
 }
 
-// 智能日志路径判断
-$logFile = file_exists('/var/log/nginx/sub_access.log') 
-    ? '/var/log/nginx/sub_access.log' 
-    : '/var/log/nginx/access.log';
+// 智能日志路径判断（自动扫描所有可能的 Nginx 日志文件）
+function getLogFilePath() {
+    $possibleLogs = [
+        '/var/log/nginx/access.log',
+        '/var/log/nginx/sub_access.log',
+        '/var/log/nginx/proxy_access.log'
+    ];
+    foreach ($possibleLogs as $file) {
+        if (file_exists($file) && filesize($file) > 0) {
+            return $file;
+        }
+    }
+    return '/var/log/nginx/access.log'; // 默认回退
+}
+
+$logFile = getLogFilePath();
 
 // ------------------- 辅助函数 -------------------
 
@@ -172,8 +184,9 @@ function getSslCertificateInfo() {
 // 1. 获取最新日志
 if ($action === 'logs' || $action === 'get_logs') {
     $logs = [];
-    if (file_exists($logFile)) {
-        $cmd = "tail -n 300 " . escapeshellarg($logFile);
+    $targetLog = getLogFilePath();
+    if (file_exists($targetLog)) {
+        $cmd = "tail -n 300 " . escapeshellarg($targetLog);
         exec($cmd, $lines);
         $lines = array_reverse($lines);
 
@@ -372,7 +385,7 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     exit;
 }
 
-// 8. 获取当前反代的目标机场域名（适配 @proxy 规则块）
+// 8. 获取当前反代的目标机场域名
 if ($action === 'get_upstream') {
     $confPath = getNginxConfPath();
     $targetDomain = '';
@@ -388,7 +401,7 @@ if ($action === 'get_upstream') {
     exit;
 }
 
-// 9. 修改反代目标域名（适配 @proxy 规则块）
+// 9. 修改反代目标域名
 if ($action === 'update_upstream') {
     $newTarget = trim($inputData['target_domain'] ?? ($_POST['target_domain'] ?? ''));
     if (empty($newTarget)) {
@@ -407,7 +420,6 @@ if ($action === 'update_upstream') {
 
     $conf = file_get_contents($confPath);
 
-    // 精确匹配 location @proxy { ... } 规则块
     if (preg_match('/(location\s+@proxy\s*\{)([\s\S]*?)(\n\s*location\s+~)/i', $conf, $matches)) {
         $subBlock = $matches[2];
 
