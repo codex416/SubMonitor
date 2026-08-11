@@ -5,7 +5,7 @@ header('Access-Control-Allow-Origin: *');
 // 强制设置默认时区为 UTC+8
 date_default_timezone_set('Asia/Shanghai');
 
-$logFile = '/var/log/nginx/sub_access.log';
+$logFile = '/etc/nginx/rules/access.log';
 $cacheFile = '/tmp/ip_cache.json'; // IP 归属地持久化磁盘缓存文件
 
 if (!file_exists($logFile)) {
