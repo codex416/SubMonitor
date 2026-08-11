@@ -9,7 +9,7 @@ $logFile = '/etc/nginx/rules/access.log';
 $cacheFile = '/tmp/ip_cache.json'; // IP 归属地持久化磁盘缓存文件
 
 if (!file_exists($logFile)) {
-    echo json_encode([]);
+    echo json_encode(['status' => 'success', 'data' => []]);
     exit;
 }
 
@@ -77,11 +77,11 @@ $lines = array_reverse($lines);
 $lines = array_slice($lines, 0, 200);
 
 $result = [];
-$targetTimeZone = new DateTimeZone('Asia/Shanghai'); // 设置目标时区为 UTC+8
+$targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
 foreach ($lines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
-        $ip       = $matches[1];
+        $ip      = $matches[1];
         $timeRaw  = $matches[2];
         $url      = $matches[3];
         $status   = $matches[4];
@@ -90,6 +90,7 @@ foreach ($lines as $line) {
 
         $token = '-';
         $queryString = parse_url($url, PHP_URL_QUERY);
+        $queryString = parse_url($url, PHP_URL_QUERY);
         if ($queryString) {
             parse_str($queryString, $queryParams);
             if (!empty($queryParams['token'])) {
@@ -97,10 +98,9 @@ foreach ($lines as $line) {
             }
         }
 
-        // 解析日志原始时间，并显式转换为 UTC+8 格式
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         if ($dt) {
-            $dt->setTimezone($targetTimeZone); // 转换至 UTC+8
+            $dt->setTimezone($targetTimeZone);
             $formattedTime = $dt->format('Y-m-d H:i:s');
         } else {
             $formattedTime = $timeRaw;
@@ -122,4 +122,8 @@ if ($cacheUpdated) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-echo json_encode($result);
+// 适配前端期望的标准结构
+echo json_encode([
+    'status' => 'success',
+    'data'   => $result
+]);
