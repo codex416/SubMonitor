@@ -37,14 +37,14 @@ if [ ! -f /etc/nginx/ssl/cert.pem ] || [ ! -f /etc/nginx/ssl/key.pem ]; then
   chmod 666 /etc/nginx/ssl/*.pem 2>/dev/null || true
 fi
 
-# 安装 acme.sh[cite: 2]
+# 安装 acme.sh
 if [ ! -f /root/.acme.sh/acme.sh ]; then
   curl https://get.acme.sh | sh -s email=admin@befriends.wiki >/dev/null 2>&1
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
 fi
 
 # ========================================================
-# 3. 轮询后台监控线程[cite: 2]
+# 3. 轮询后台监控线程
 # ========================================================
 (while true; do
   if [ -f /etc/nginx/rules/.cert_flag ]; then
@@ -52,7 +52,7 @@ fi
     rm -f /etc/nginx/rules/.cert_flag
     echo '{"status":"processing","msg":"正在向 Let'\''s Encrypt 申请证书，请稍候..."}' > /etc/nginx/rules/cert_status.json
     
-    # 申请证书前先 reload 确保 Nginx 已应用最新 server_name[cite: 2]
+    # 申请证书前先 reload 确保 Nginx 已应用最新 server_name
     nginx -s reload >/dev/null 2>&1
     
     /root/.acme.sh/acme.sh --issue -d "$DOMAIN" -w /var/www/html --accountemail admin@befriends.wiki --force
@@ -78,6 +78,6 @@ fi
 done) &
 
 # ========================================================
-# 4. 启动 Nginx 主进程[cite: 2]
+# 4. 启动 Nginx 主进程
 # ========================================================
 exec nginx -g 'daemon off;'
