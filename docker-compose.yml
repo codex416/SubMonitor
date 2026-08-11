@@ -7,6 +7,7 @@ services:
       - ./html:/var/www/html
       - ./nginx/default.conf:/etc/nginx/conf.d/default.conf
       - ./rules:/etc/nginx/rules
+      - ./rules:/var/www/html/rules
       - log-data:/var/log/nginx
 
   nginx:
