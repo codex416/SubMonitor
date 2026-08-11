@@ -9,7 +9,7 @@ $logFile = '/etc/nginx/rules/access.log';
 $cacheFile = '/tmp/ip_cache.json'; // IP 归属地持久化磁盘缓存文件
 
 if (!file_exists($logFile)) {
-    echo json_encode(['status' => 'success', 'data' => []]);
+    echo json_encode([]);
     exit;
 }
 
@@ -60,6 +60,10 @@ function getIpLocation($ip, &$ipCache, &$cacheUpdated) {
 
 // 2. 读取日志末尾 128KB
 $fp = fopen($logFile, 'r');
+if (!$fp) {
+    echo json_encode([]);
+    exit;
+}
 $size = filesize($logFile);
 $readSize = min($size, 131072);
 $lines = [];
@@ -90,7 +94,6 @@ foreach ($lines as $line) {
 
         $token = '-';
         $queryString = parse_url($url, PHP_URL_QUERY);
-        $queryString = parse_url($url, PHP_URL_QUERY);
         if ($queryString) {
             parse_str($queryString, $queryParams);
             if (!empty($queryParams['token'])) {
@@ -98,6 +101,7 @@ foreach ($lines as $line) {
             }
         }
 
+        // 解析日志原始时间，并显式转换为 UTC+8 格式
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         if ($dt) {
             $dt->setTimezone($targetTimeZone);
@@ -122,8 +126,5 @@ if ($cacheUpdated) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-// 适配前端期望的标准结构
-echo json_encode([
-    'status' => 'success',
-    'data'   => $result
-]);
+// 直接输出纯数组供前端解析
+echo json_encode($result, JSON_UNESCAPED_UNICODE);
