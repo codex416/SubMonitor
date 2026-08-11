@@ -12,16 +12,13 @@ $uaFile     = '/etc/nginx/rules/ua_blacklist.conf';
 $tokenFile  = '/etc/nginx/rules/token_blacklist.conf';
 $reloadFlag = '/etc/nginx/rules/.reload_flag';
 
-// 智能日志路径判断（优先匹配订阅代理日志 sub_access.log，若无则使用默认 access.log）
+// 智能日志路径判断
 $logFile = file_exists('/var/log/nginx/sub_access.log') 
     ? '/var/log/nginx/sub_access.log' 
     : '/var/log/nginx/access.log';
 
 // ------------------- 辅助函数 -------------------
 
-/**
- * 安全写入文件并自动赋予可读写权限（0666/0777）
- */
 function safeWriteFile($filePath, $content, $append = false) {
     $dir = dirname($filePath);
     
@@ -77,13 +74,9 @@ function parseRuleValue($type, $line) {
     return null;
 }
 
-/**
- * 解析并获取当前 SSL 证书详细状态
- */
 function getSslCertificateInfo() {
     $certPath = '/etc/nginx/ssl/cert.pem';
     
-    // 1. 优先尝试直接解析挂载的本地证书文件
     if (file_exists($certPath) && is_readable($certPath)) {
         $certContent = @file_get_contents($certPath);
         if ($certContent) {
@@ -118,7 +111,6 @@ function getSslCertificateInfo() {
         }
     }
 
-    // 2. 若文件不可读取，尝试发起 443 SSL 握手实时探测
     $host = $_SERVER['HTTP_HOST'] ?? '';
     $domain = explode(':', $host)[0];
     if (!empty($domain) && $domain !== 'localhost' && !filter_var($domain, FILTER_VALIDATE_IP)) {
@@ -152,7 +144,6 @@ function getSslCertificateInfo() {
         }
     }
 
-    // 3. 检查是否有后台申请中的任务状态
     $statusFile = '/etc/nginx/rules/cert_status.json';
     if (file_exists($statusFile)) {
         $json = json_decode(file_get_contents($statusFile), true);
@@ -322,7 +313,6 @@ if ($action === 'get_domain') {
     $domain = '';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        // 精确匹配 server_name
         if (preg_match('/\bserver_name\s+([^;]+);/', $conf, $matches)) {
             $domain = trim($matches[1]);
         }
@@ -337,7 +327,7 @@ if ($action === 'get_domain') {
     exit;
 }
 
-// 7. 更新域名并触发证书申请
+// 7. 更新面板监听域名并触发证书申请
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
@@ -348,7 +338,6 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        // 精确匹配 server_name，防止误替换 proxy_ssl_server_name
         $newConf = preg_replace('/\bserver_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
         
         if (!safeWriteFile($confPath, $newConf)) {
@@ -375,6 +364,67 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
 
     echo json_encode(['status' => 'success', 'message' => '配置已更新，正在后台自动申请证书...']);
     exit;
+}
+
+// 8. 获取当前反代目标域名（机场域名）
+if ($action === 'get_upstream') {
+    $confPath = '/etc/nginx/conf.d/default.conf';
+    $targetDomain = '';
+    if (file_exists($confPath)) {
+        $conf = file_get_contents($confPath);
+        if (preg_match('/location\s+\/sub\/\s*\{[^}]*proxy_ssl_name\s+([^;]+);/s', $conf, $matches)) {
+            $targetDomain = trim($matches[1]);
+        } elseif (preg_match('/location\s+\/sub\/\s*\{[^}]*proxy_pass\s+https?:\/\/([^;\/]+)/s', $conf, $matches)) {
+            $targetDomain = trim($matches[1]);
+        }
+    }
+    echo json_encode(['status' => 'success', 'upstream' => $targetDomain]);
+    exit;
+}
+
+// 9. 修改反代目标域名（机场域名）
+if ($action === 'update_upstream') {
+    $newTarget = trim($inputData['target_domain'] ?? ($_POST['target_domain'] ?? ''));
+    if (empty($newTarget)) {
+        echo json_encode(['status' => 'error', 'message' => '目标域名不能为空']);
+        exit;
+    }
+
+    // 过滤协议前缀与结尾斜杠
+    $newTarget = preg_replace('/^https?:\/\//i', '', $newTarget);
+    $newTarget = rtrim($newTarget, '/');
+
+    $confPath = '/etc/nginx/conf.d/default.conf';
+    if (!file_exists($confPath)) {
+        echo json_encode(['status' => 'error', 'message' => '找不到 Nginx 配置文件']);
+        exit;
+    }
+
+    $conf = file_get_contents($confPath);
+
+    // 精确匹配 location /sub/ 规则块并替换其中的 proxy_pass, Host, proxy_ssl_name
+    if (preg_match('/(location\s+\/sub\/\s*\{)(.*?\}[\s]*)/s', $conf, $matches)) {
+        $subBlock = $matches[2];
+        $subBlock = preg_replace('/proxy_pass\s+https?:\/\/[^;\/]+/', "proxy_pass https://{$newTarget}", $subBlock);
+        $subBlock = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/', "proxy_set_header Host {$newTarget};", $subBlock);
+        $subBlock = preg_replace('/proxy_ssl_name\s+[^;]+;/', "proxy_ssl_name {$newTarget};", $subBlock);
+
+        $newConf = str_replace($matches[2], $subBlock, $conf);
+
+        if (!safeWriteFile($confPath, $newConf)) {
+            echo json_encode(['status' => 'error', 'message' => "权限不足！无法写入 Nginx 配置文件: {$confPath}"]);
+            exit;
+        }
+
+        // 触发 Nginx 热重载标志
+        safeWriteFile($reloadFlag, time());
+
+        echo json_encode(['status' => 'success', 'message' => '反代目标域名更新成功！']);
+        exit;
+    } else {
+        echo json_encode(['status' => 'error', 'message' => 'Nginx 配置中未查找到 location /sub/ 代理规则块']);
+        exit;
+    }
 }
 
 echo json_encode(['status' => 'error', 'message' => '无效的操作指令']);
