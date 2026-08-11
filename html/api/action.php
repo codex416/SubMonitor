@@ -7,11 +7,15 @@ $inputData = json_decode($rawInput, true) ?: [];
 
 $action = $_GET['action'] ?? ($inputData['action'] ?? ($_POST['action'] ?? ''));
 
-$ipFile = '/etc/nginx/rules/ip_blacklist.conf';
-$uaFile = '/etc/nginx/rules/ua_blacklist.conf';
-$tokenFile = '/etc/nginx/rules/token_blacklist.conf';
+$ipFile     = '/etc/nginx/rules/ip_blacklist.conf';
+$uaFile     = '/etc/nginx/rules/ua_blacklist.conf';
+$tokenFile  = '/etc/nginx/rules/token_blacklist.conf';
 $reloadFlag = '/etc/nginx/rules/.reload_flag';
-$logFile = '/var/log/nginx/access.log';
+
+// 智能日志路径判断（优先匹配订阅代理日志 sub_access.log，若无则使用默认 access.log）
+$logFile = file_exists('/var/log/nginx/sub_access.log') 
+    ? '/var/log/nginx/sub_access.log' 
+    : '/var/log/nginx/access.log';
 
 // ------------------- 辅助函数 -------------------
 
@@ -43,6 +47,101 @@ function parseRuleValue($type, $line) {
         return $m[1];
     }
     return null;
+}
+
+/**
+ * 解析并获取当前 SSL 证书详细状态（宝塔面板风格数据源）
+ */
+function getSslCertificateInfo() {
+    $certPath = '/etc/nginx/ssl/cert.pem';
+    
+    // 1. 优先尝试直接解析挂载的本地证书文件
+    if (file_exists($certPath) && is_readable($certPath)) {
+        $certContent = @file_get_contents($certPath);
+        if ($certContent) {
+            $certData = @openssl_x509_parse($certContent);
+            if ($certData) {
+                $validTo = $certData['validTo_time_t'] ?? 0;
+                $daysLeft = ceil(($validTo - time()) / 86400);
+                
+                // 提取域名 (优先提取主题扩展 SAN 或 通用名 CN)
+                $domain = $certData['subject']['CN'] ?? '';
+                if (isset($certData['extensions']['subjectAltName'])) {
+                    $sans = explode(',', $certData['extensions']['subjectAltName']);
+                    $cleanedSans = array_map(function($s) {
+                        return trim(str_replace('DNS:', '', $s));
+                    }, $sans);
+                    if (!empty($cleanedSans)) {
+                        $domain = implode(', ', $cleanedSans);
+                    }
+                }
+
+                // 提取签发机构名称
+                $issuer = $certData['issuer']['O'] ?? ($certData['issuer']['CN'] ?? 'Let\'s Encrypt');
+
+                return [
+                    'status' => 'success',
+                    'cert' => [
+                        'domain'    => $domain ?: '未知域名',
+                        'issuer'    => $issuer,
+                        'valid_to'  => date('Y-m-d H:i:s', $validTo),
+                        'days_left' => max(0, (int)$daysLeft)
+                    ]
+                ];
+            }
+        }
+    }
+
+    // 2. 若文件不可读取，尝试发起 443 SSL 握手实时探测
+    $host = $_SERVER['HTTP_HOST'] ?? '';
+    $domain = explode(':', $host)[0];
+    if (!empty($domain) && $domain !== 'localhost' && !filter_var($domain, FILTER_VALIDATE_IP)) {
+        $context = stream_context_create([
+            "ssl" => [
+                "capture_peer_cert" => true,
+                "verify_peer"       => false,
+                "verify_peer_name"  => false
+            ]
+        ]);
+        $client = @stream_socket_client("ssl://{$domain}:443", $errno, $errstr, 3, STREAM_CLIENT_CONNECT, $context);
+        if ($client) {
+            $params = stream_context_get_params($client);
+            fclose($client);
+            if (isset($params["options"]["ssl"]["peer_certificate"])) {
+                $certData = openssl_x509_parse($params["options"]["ssl"]["peer_certificate"]);
+                $validTo  = $certData['validTo_time_t'] ?? 0;
+                $daysLeft = ceil(($validTo - time()) / 86400);
+                $issuer   = $certData['issuer']['O'] ?? ($certData['issuer']['CN'] ?? 'Let\'s Encrypt');
+
+                return [
+                    'status' => 'success',
+                    'cert' => [
+                        'domain'    => $certData['subject']['CN'] ?? $domain,
+                        'issuer'    => $issuer,
+                        'valid_to'  => date('Y-m-d H:i:s', $validTo),
+                        'days_left' => max(0, (int)$daysLeft)
+                    ]
+                ];
+            }
+        }
+    }
+
+    // 3. 检查是否有后台申请中的任务状态
+    $statusFile = '/etc/nginx/rules/cert_status.json';
+    if (file_exists($statusFile)) {
+        $json = json_decode(file_get_contents($statusFile), true);
+        if (!empty($json)) {
+            return [
+                'status'  => 'processing',
+                'message' => $json['msg'] ?? '证书申请中...'
+            ];
+        }
+    }
+
+    return [
+        'status'  => 'error',
+        'message' => '未检测到有效 SSL 证书文件或 443 端口未启用 SSL'
+    ];
 }
 
 // ------------------- 路由处理 -------------------
@@ -183,7 +282,13 @@ if ($action === 'unban') {
     exit;
 }
 
-// 5. 获取域名配置
+// 5. 新增路由：实时查询 SSL 证书状态
+if ($action === 'cert_status') {
+    echo json_encode(getSslCertificateInfo());
+    exit;
+}
+
+// 6. 获取域名配置与状态
 if ($action === 'get_domain') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     $domain = '';
@@ -194,17 +299,16 @@ if ($action === 'get_domain') {
         }
     }
 
-    $status = ['status' => 'idle', 'msg' => ''];
-    $statusFile = '/etc/nginx/rules/cert_status.json';
-    if (file_exists($statusFile)) {
-        $status = json_decode(file_get_contents($statusFile), true) ?: $status;
-    }
+    $certInfo = getSslCertificateInfo();
 
-    echo json_encode(['domain' => $domain, 'cert_status' => $status]);
+    echo json_encode([
+        'domain'      => $domain,
+        'cert_status' => $certInfo
+    ]);
     exit;
 }
 
-// 6. 更新域名并触发申请
+// 7. 更新域名并触发证书申请
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
@@ -222,7 +326,7 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     file_put_contents('/etc/nginx/rules/.cert_flag', $newDomain);
     file_put_contents('/etc/nginx/rules/cert_status.json', json_encode([
         'status' => 'processing',
-        'msg' => '已提交申请，后台正在联系 Let\'s Encrypt 签发证书...'
+        'msg'    => '已提交申请，后台正在联系 Let\'s Encrypt 签发证书...'
     ]));
 
     echo json_encode(['status' => 'success', 'message' => '配置已更新，正在后台自动申请证书...']);
