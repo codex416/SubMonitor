@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// 1. 统一解析来自前端的 JSON Body、GET 与 POST 参数
+// 统一解析来自前端的 JSON Body、GET 与 POST 参数
 $rawInput = file_get_contents('php://input');
 $inputData = json_decode($rawInput, true) ?: [];
 
@@ -47,29 +47,30 @@ function parseRuleValue($type, $line) {
 
 // ------------------- 路由处理 -------------------
 
-// 1. 获取日志列表 (只读最后 300 行，极速解析)
+// 1. 获取最新日志（仅取末尾 300 行，解决慢和 UA 缺失问题）
 if ($action === 'logs' || $action === 'get_logs') {
     $logs = [];
     if (file_exists($logFile)) {
-        // 使用 tail 读取末尾 300 行
+        // 使用 tail 指令秒级读取末尾最新日志
         $cmd = "tail -n 300 " . escapeshellarg($logFile);
         exec($cmd, $lines);
         $lines = array_reverse($lines);
 
-        // 正则匹配标准 Nginx 格式: IP - - [TIME] "METHOD URL PROTOCOL" STATUS BYTES "REFERER" "UA"
+        // 匹配 Nginx 默认 combined 格式: 
+        // IP - - [时间] "请求方法 路径 协议" 状态码 发送字节数 "Referer" "User-Agent"
         $pattern = '/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+)\s+([^\s"]*)[^"]*" (\d+) \d+ "([^"]*)" "([^"]*)"/';
 
         foreach ($lines as $line) {
             if (preg_match($pattern, $line, $m)) {
-                $rawIp = $m[1];
-                $time = $m[2];
-                $method = $m[3];
-                $url = $m[4];
-                $status = $m[5];
-                $referer = $m[6] === '-' ? '' : $m[6];
-                $ua = $m[7] === '-' ? '' : $m[7];
+                $rawIp   = $m[1];
+                $time    = $m[2];
+                $method  = $m[3];
+                $url     = $m[4];
+                $status  = $m[5];
+                $referer = ($m[6] === '-') ? '' : $m[6];
+                $ua      = ($m[7] === '-') ? '' : $m[7]; // 正确提取 UA
 
-                // 从 URL 解析 token 参数
+                // 提取 URL 参数中的 token
                 $token = '';
                 $parsedUrl = parse_url($url);
                 if (isset($parsedUrl['query'])) {
@@ -78,14 +79,14 @@ if ($action === 'logs' || $action === 'get_logs') {
                 }
 
                 $logs[] = [
-                    'ip' => $rawIp,
-                    'time' => $time,
-                    'method' => $method,
-                    'path' => $parsedUrl['path'] ?? $url,
-                    'url' => $url,
-                    'status' => (int)$status,
-                    'token' => $token,
-                    'ua' => $ua,
+                    'ip'      => $rawIp,
+                    'time'    => $time,
+                    'method'  => $method,
+                    'path'    => $parsedUrl['path'] ?? $url,
+                    'url'     => $url,
+                    'status'  => (int)$status,
+                    'token'   => $token,
+                    'ua'      => $ua,
                     'referer' => $referer
                 ];
             }
@@ -112,8 +113,8 @@ if ($action === 'list') {
     echo json_encode([
         'status' => 'success',
         'data' => [
-            'ip' => $getRules($ipFile, 'ip'),
-            'ua' => $getRules($uaFile, 'ua'),
+            'ip'    => $getRules($ipFile, 'ip'),
+            'ua'    => $getRules($uaFile, 'ua'),
             'token' => $getRules($tokenFile, 'token')
         ]
     ]);
@@ -122,7 +123,7 @@ if ($action === 'list') {
 
 // 3. 执行封禁
 if ($action === 'ban') {
-    $type = $inputData['type'] ?? ($_POST['type'] ?? '');
+    $type  = $inputData['type'] ?? ($_POST['type'] ?? '');
     $value = trim($inputData['value'] ?? ($_POST['value'] ?? ''));
 
     if (!in_array($type, ['ip', 'ua', 'token']) || empty($value)) {
@@ -131,8 +132,8 @@ if ($action === 'ban') {
     }
 
     $targetFile = match($type) {
-        'ip' => $ipFile,
-        'ua' => $uaFile,
+        'ip'    => $ipFile,
+        'ua'    => $uaFile,
         'token' => $tokenFile
     };
 
@@ -150,12 +151,12 @@ if ($action === 'ban') {
 
 // 4. 执行解封
 if ($action === 'unban') {
-    $type = $inputData['type'] ?? ($_POST['type'] ?? '');
+    $type  = $inputData['type'] ?? ($_POST['type'] ?? '');
     $value = trim($inputData['value'] ?? ($_POST['value'] ?? ''));
 
     $targetFile = match($type) {
-        'ip' => $ipFile,
-        'ua' => $uaFile,
+        'ip'    => $ipFile,
+        'ua'    => $uaFile,
         'token' => $tokenFile,
         default => null
     };
@@ -182,7 +183,7 @@ if ($action === 'unban') {
     exit;
 }
 
-// 5. 获取域名与证书状态
+// 5. 获取域名配置
 if ($action === 'get_domain') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     $domain = '';
@@ -203,7 +204,7 @@ if ($action === 'get_domain') {
     exit;
 }
 
-// 6. 更新域名并触发证书申请
+// 6. 更新域名并触发申请
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
