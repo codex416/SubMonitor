@@ -3,18 +3,31 @@
 # 安装依赖
 apk add --no-cache curl openssl socat >/dev/null 2>&1
 
-# 安装 acme.sh
+# 检查并生成初始临时自签名证书，防止 Nginx 启动崩溃[cite: 21]
+mkdir -p /etc/nginx/ssl
+if [ ! -f /etc/nginx/ssl/cert.pem ] || [ ! -f /etc/nginx/ssl/key.pem ]; then
+  openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+    -keyout /etc/nginx/ssl/key.pem \
+    -out /etc/nginx/ssl/cert.pem \
+    -subj "/CN=localhost" >/dev/null 2>&1
+fi
+
+# 安装 acme.sh[cite: 21]
 if [ ! -f /root/.acme.sh/acme.sh ]; then
   curl https://get.acme.sh | sh -s email=admin@befriends.wiki >/dev/null 2>&1
   /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
 fi
 
-# 轮询后台监控线程
+# 轮询后台监控线程[cite: 21]
 (while true; do
   if [ -f /etc/nginx/rules/.cert_flag ]; then
     DOMAIN=$(cat /etc/nginx/rules/.cert_flag)
     rm -f /etc/nginx/rules/.cert_flag
     echo '{"status":"processing","msg":"正在向 Let'\''s Encrypt 申请证书，请稍候..."}' > /etc/nginx/rules/cert_status.json
+    
+    # 申请证书前先 reload 确保 Nginx 已应用最新 server_name[cite: 21]
+    nginx -s reload >/dev/null 2>&1
+    
     /root/.acme.sh/acme.sh --issue -d "$DOMAIN" -w /var/www/html --accountemail admin@befriends.wiki --force
     if [ $? -eq 0 ]; then
       /root/.acme.sh/acme.sh --install-cert -d "$DOMAIN" \
@@ -33,5 +46,5 @@ fi
   sleep 2
 done) &
 
-# 启动 Nginx 主进程
+# 启动 Nginx 主进程[cite: 21]
 exec nginx -g 'daemon off;'
