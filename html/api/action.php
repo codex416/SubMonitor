@@ -16,7 +16,8 @@ function getNginxConfPath() {
     return !empty($confFiles) ? $confFiles[0] : '/etc/nginx/conf.d/default.conf';
 }
 
-$logFile = '/var/log/nginx/access.log';
+// 【关键修改】：去读真实的物理日志文件
+$logFile = '/etc/nginx/rules/access.log';
 
 function safeWriteFile($filePath, $content, $append = false) {
     $dir = dirname($filePath);
@@ -198,7 +199,7 @@ if ($action === 'get_upstream') {
     exit;
 }
 
-// 9. 修改反代目标（精准匹配 location @proxy 块）
+// 9. 修改反代目标
 if ($action === 'update_upstream') {
     $newTarget = trim($inputData['target_domain'] ?? ($_POST['target_domain'] ?? ''));
     if (empty($newTarget)) {
