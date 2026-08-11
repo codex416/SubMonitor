@@ -25,7 +25,6 @@ $logFile = file_exists('/var/log/nginx/sub_access.log')
 function safeWriteFile($filePath, $content, $append = false) {
     $dir = dirname($filePath);
     
-    // 如果目录不存在，尝试递归创建并赋予读写权限
     if (!is_dir($dir)) {
         @mkdir($dir, 0777, true);
         @chmod($dir, 0777);
@@ -33,7 +32,6 @@ function safeWriteFile($filePath, $content, $append = false) {
         @chmod($dir, 0777);
     }
 
-    // 如果文件已存在，尝试提升可写入权限
     if (file_exists($filePath)) {
         @chmod($filePath, 0666);
     }
@@ -41,7 +39,6 @@ function safeWriteFile($filePath, $content, $append = false) {
     $flags = $append ? FILE_APPEND : 0;
     $result = @file_put_contents($filePath, $content, $flags);
 
-    // 写入成功后赋予全公开读写权限，防止后续读取或更新失败
     if ($result !== false) {
         @chmod($filePath, 0666);
         return true;
@@ -325,7 +322,8 @@ if ($action === 'get_domain') {
     $domain = '';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        if (preg_match('/server_name\s+([^;]+);/', $conf, $matches)) {
+        // 精确匹配 server_name
+        if (preg_match('/\bserver_name\s+([^;]+);/', $conf, $matches)) {
             $domain = trim($matches[1]);
         }
     }
@@ -350,19 +348,18 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        $newConf = preg_replace('/server_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
+        // 精确匹配 server_name，防止误替换 proxy_ssl_server_name
+        $newConf = preg_replace('/\bserver_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
         
-        // 1. 修改 Nginx 配置文件
         if (!safeWriteFile($confPath, $newConf)) {
             echo json_encode([
                 'status'  => 'error', 
-                'message' => "权限不足！PHP 无法写入 Nginx 配置文件: {$confPath}。请在服务器执行 docker 提升权限。"
+                'message' => "权限不足！PHP 无法写入 Nginx 配置文件: {$confPath}"
             ]);
             exit;
         }
     }
 
-    // 2. 写入触发标志文件
     if (!safeWriteFile('/etc/nginx/rules/.cert_flag', $newDomain)) {
         echo json_encode([
             'status'  => 'error', 
@@ -371,7 +368,6 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
         exit;
     }
 
-    // 3. 更新状态文件
     safeWriteFile('/etc/nginx/rules/cert_status.json', json_encode([
         'status' => 'processing',
         'msg'    => '已提交申请，后台正在联系 Let\'s Encrypt 签发证书...'
