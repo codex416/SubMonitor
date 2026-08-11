@@ -62,7 +62,7 @@ if (!$fp) {
     exit;
 }
 $size = filesize($logFile);
-$readSize = min($size, 262144); // 读取更大的日志范围
+$readSize = min($size, 262144);
 $lines = [];
 
 if ($readSize > 0) {
@@ -87,14 +87,15 @@ foreach ($lines as $line) {
         $referer  = $matches[5];
         $ua       = $matches[6];
 
-        // 过滤掉面板自身的 API 请求，避免日志被自己刷屏
-        if (strpos($url, '/api/') !== false) {
+        $parsedUrl = parse_url($url);
+        $path = $parsedUrl['path'] ?? $url;
+
+        // 严格过滤掉面板自身的 API、首页、静态文件请求，避免日志被自己刷屏
+        if (strpos($url, '/api/') !== false || $path === '/' || $path === '/index.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff|woff2)$/i', $path)) {
             continue;
         }
 
         $token = '-';
-        $parsedUrl = parse_url($url);
-        $path = $parsedUrl['path'] ?? $url;
         $queryString = $parsedUrl['query'] ?? '';
 
         // 1. 尝试从 Query 参数中获取 token (?token=xxx)
@@ -109,7 +110,6 @@ foreach ($lines as $line) {
         if ($token === '-' && $path !== '/' && $path !== '') {
             $segments = explode('/', trim($path, '/'));
             foreach ($segments as $seg) {
-                // 假设 Token 或 UUID 长度通常大于等于 8 位，且不是常见静态目录
                 if (strlen($seg) >= 8 && !in_array($seg, ['sub', 'api', 'static', 'assets'])) {
                     $token = $seg;
                     break;
@@ -134,7 +134,6 @@ foreach ($lines as $line) {
             'ua'      => $ua
         ];
 
-        // 限制最多展示前 100 条有效业务日志
         if (count($result) >= 100) {
             break;
         }
