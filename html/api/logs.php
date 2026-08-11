@@ -80,7 +80,7 @@ $targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
 foreach ($lines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
-        $ip      = $matches[1];
+        $ip       = $matches[1];
         $timeRaw  = $matches[2];
         $url      = $matches[3];
         $status   = $matches[4];
@@ -116,6 +116,11 @@ foreach ($lines as $line) {
                     break;
                 }
             }
+        }
+
+        // 核心修改：如果未检测到有效 Token，直接跳过不予展示
+        if ($token === '-') {
+            continue;
         }
 
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
