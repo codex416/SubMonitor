@@ -1,24 +1,33 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
+header('Access-Control-Allow-Origin: *');
+
+// 强制设置默认时区为 UTC+8
+date_default_timezone_set('Asia/Shanghai');
 
 $logFile = '/var/log/nginx/sub_access.log';
-$cacheFile = __DIR__ . '/ip_cache.json';
+$cacheFile = '/tmp/ip_cache.json'; // IP 归属地持久化磁盘缓存文件
 
-// 加载 IP 缓存
+if (!file_exists($logFile)) {
+    echo json_encode([]);
+    exit;
+}
+
+// 1. 读取本地磁盘持久化 IP 缓存
 $ipCache = [];
 if (file_exists($cacheFile)) {
     $ipCache = json_decode(file_get_contents($cacheFile), true) ?: [];
 }
 
-// IP 地理位置查询（含超限处理与快速回退）
-function getIpLocation($ip, &$ipCache, $cacheFile) {
-    if (isset($ipCache[$ip])) {
-        return $ipCache[$ip];
+$cacheUpdated = false;
+
+function getIpLocation($ip, &$ipCache, &$cacheUpdated) {
+    if (!$ip || $ip === '-') return '未知';
+    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
+        return "局域网 IP";
     }
 
-    if ($ip === '127.0.0.1' || $ip === 'localhost' || strpos($ip, '192.168.') === 0 || strpos($ip, '10.') === 0) {
-        $ipCache[$ip] = '局域网 / 本地访问';
-        file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
+    if (isset($ipCache[$ip])) {
         return $ipCache[$ip];
     }
 
@@ -29,70 +38,88 @@ function getIpLocation($ip, &$ipCache, $cacheFile) {
         ]
     ]);
 
-    $json = @file_get_contents("http://ip-api.com/json/{$ip}?lang=zh-CN", false, $ctx);
-    if ($json) {
-        $data = json_decode($json, true);
+    $res = @file_get_contents("http://ip-api.com/json/{$ip}?lang=zh-CN", false, $ctx);
+    if ($res) {
+        $data = json_decode($res, true);
         if ($data && isset($data['status']) && $data['status'] === 'success') {
-            $location = ($data['country'] ?? '') . ' ' . ($data['regionName'] ?? '') . ' ' . ($data['city'] ?? '');
-            $location = trim($location) ?: '未知网络';
-            $ipCache[$ip] = $location;
-            file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
-            return $location;
+            $info = sprintf("%s %s %s %s", 
+                $data['country'] ?? '', 
+                $data['regionName'] ?? '', 
+                $data['city'] ?? '', 
+                $data['isp'] ?? ''
+            );
+            $info = trim($info) ?: '公网 IP';
+            $ipCache[$ip] = $info;
+            $cacheUpdated = true;
+            return $info;
         }
     }
 
-    // 规避频率限制，失败时临时记录为未知，避免卡顿
-    return '未知（查询受限）';
+    return "公网 IP";
 }
 
-if (!file_exists($logFile)) {
-    echo json_encode(['status' => 'success', 'data' => [], 'summary' => ['total' => 0, 'unique_ips' => 0]]);
-    exit;
+// 2. 读取日志末尾 128KB
+$fp = fopen($logFile, 'r');
+$size = filesize($logFile);
+$readSize = min($size, 131072);
+$lines = [];
+
+if ($readSize > 0) {
+    fseek($fp, $size - $readSize);
+    $data = fread($fp, $readSize);
+    fclose($fp);
+    $lines = array_filter(explode("\n", $data));
+} else {
+    fclose($fp);
 }
 
-$lines = file($logFile, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES);
-$logs = [];
-$uniqueIps = [];
-
-// 倒序读取最近的日志记录
 $lines = array_reverse($lines);
-$maxLines = 500;
-$count = 0;
+$lines = array_slice($lines, 0, 200);
+
+$result = [];
+$targetTimeZone = new DateTimeZone('Asia/Shanghai'); // 设置目标时区为 UTC+8
 
 foreach ($lines as $line) {
-    if ($count >= $maxLines) break;
-
-    // 兼容 HTTP/1.1、HTTP/2 及各种请求方法的日志正则
-    if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(\S+)\s+(\S+)\s+HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
+    if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/\d\.\d" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
         $ip       = $matches[1];
         $timeRaw  = $matches[2];
-        $method   = $matches[3];
-        $url      = $matches[4];
-        $status   = $matches[5];
-        $referer  = $matches[6];
-        $ua       = $matches[7];
+        $url      = $matches[3];
+        $status   = $matches[4];
+        $referer  = $matches[5];
+        $ua       = $matches[6];
 
-        $uniqueIps[$ip] = true;
-        $location = getIpLocation($ip, $ipCache, $cacheFile);
+        $token = '-';
+        $queryString = parse_url($url, PHP_URL_QUERY);
+        if ($queryString) {
+            parse_str($queryString, $queryParams);
+            if (!empty($queryParams['token'])) {
+                $token = $queryParams['token'];
+            }
+        }
 
-        $logs[] = [
-            'ip'       => $ip,
-            'location' => $location,
-            'time'     => $timeRaw,
-            'method'   => $method,
-            'url'      => $url,
-            'status'   => $status,
-            'ua'       => $ua
+        // 解析日志原始时间，并显式转换为 UTC+8 格式
+        $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
+        if ($dt) {
+            $dt->setTimezone($targetTimeZone); // 转换至 UTC+8
+            $formattedTime = $dt->format('Y-m-d H:i:s');
+        } else {
+            $formattedTime = $timeRaw;
+        }
+
+        $result[] = [
+            'time'    => $formattedTime,
+            'ip'      => $ip,
+            'ip_info' => getIpLocation($ip, $ipCache, $cacheUpdated),
+            'token'   => $token,
+            'status'  => $status,
+            'ua'      => $ua
         ];
-        $count++;
     }
 }
 
-echo json_encode([
-    'status' => 'success',
-    'summary' => [
-        'total'      => count($lines),
-        'unique_ips' => count($uniqueIps)
-    ],
-    'data' => $logs
-], JSON_UNESCAPED_UNICODE);
+// 4. 更新磁盘缓存
+if ($cacheUpdated) {
+    @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
+}
+
+echo json_encode($result);
