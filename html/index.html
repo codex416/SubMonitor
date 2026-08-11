@@ -834,8 +834,14 @@
                 <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
                 <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
             </div>
-            <div id="cert-status-box" style="display:none; width:100%; font-size:0.78rem; padding:8px 12px; background:#f0f6ff; border:1px solid #bfdbfe; border-radius:8px; color:#1e40af; font-family:monospace; word-break:break-all;">
-                等待提交申请...
+            <!-- 宝塔式 SSL 证书状态面板 -->
+            <div id="cert-status-box" style="display:block; width:100%; font-size:0.78rem; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-family:monospace; word-break:break-all;">
+                <div style="display:flex; justify-content:space-between; align-items:center;">
+                    <span>🔒 SSL证书状态：<span id="cert-status-text" style="color:var(--text-muted)">正在获取证书状态...</span></span>
+                    <button class="fill-helper-btn" onclick="checkCertStatus()" style="font-size:0.75rem;">🔄 刷新状态</button>
+                </div>
+                <div id="cert-detail-info" style="display:none; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); line-height:1.6; font-size:0.75rem; color:var(--text-muted);">
+                </div>
             </div>
         </div>
 
@@ -949,9 +955,50 @@
 
         function padZero(n) { return n.toString().padStart(2, '0'); }
 
+        // 查询宝塔式 SSL 证书状态
+        async function checkCertStatus() {
+            const statusText = document.getElementById('cert-status-text');
+            const detailBox = document.getElementById('cert-detail-info');
+            if (statusText) statusText.innerText = '正在获取证书状态...';
+
+            try {
+                const res = await fetch('/api/action.php?action=cert_status');
+                const data = await res.json();
+                
+                if (data.status === 'success' && data.cert) {
+                    const cert = data.cert;
+                    let statusColor = 'var(--primary-green)';
+                    let statusBadge = '🟢 证书生效中';
+                    
+                    if (cert.days_left !== undefined && cert.days_left <= 0) {
+                        statusColor = 'var(--primary-red)';
+                        statusBadge = '🔴 证书已过期';
+                    } else if (cert.days_left !== undefined && cert.days_left <= 15) {
+                        statusColor = '#b45309';
+                        statusBadge = '🟡 证书即将过期';
+                    }
+
+                    statusText.innerHTML = `<strong style="color:${statusColor};">${statusBadge}</strong>`;
+                    detailBox.style.display = 'block';
+                    detailBox.innerHTML = `
+                        <div>绑定域名：<strong style="color:var(--text-primary);">${escapeHtml(cert.domain || '-')}</strong></div>
+                        <div>签发机构：${escapeHtml(cert.issuer || 'Let\'s Encrypt / ZeroSSL')} | 剩余有效期：<strong style="color:${statusColor};">${cert.days_left ?? '-'} 天</strong></div>
+                        <div>到期时间：${escapeHtml(cert.valid_to || '-')}</div>
+                    `;
+                } else {
+                    statusText.innerHTML = `<span style="color:#b45309;">⚠️ 未检测到有效 SSL 证书或尚未配置</span>`;
+                    detailBox.style.display = 'none';
+                }
+            } catch (err) {
+                statusText.innerHTML = `<span style="color:var(--text-muted);">暂无证书状态数据或接口待响应</span>`;
+                detailBox.style.display = 'none';
+            }
+        }
+
         async function submitDomainCert() {
             const domainInput = document.getElementById('domain-input');
-            const statusBox = document.getElementById('cert-status-box');
+            const statusText = document.getElementById('cert-status-text');
+            const detailBox = document.getElementById('cert-detail-info');
             const domain = domainInput.value.trim();
 
             if (!domain) {
@@ -959,8 +1006,9 @@
                 return;
             }
 
-            statusBox.style.display = 'block';
-            statusBox.innerHTML = '⏱️ 正在提交域名配置，并向 ACME/Let\'s Encrypt 申请 SSL 证书，请稍候...';
+            statusText.innerHTML = '⏱️ 正在提交域名配置，向 ACME/Let\'s Encrypt 申请 SSL 证书...';
+            detailBox.style.display = 'block';
+            detailBox.innerHTML = '<div style="color:var(--primary-blue);">👉 [1/3] 正在验证域名 DNS 解析与端口可达性...<br>👉 [2/3] 发起 ACME HTTP-01 验证挑战...</div>';
 
             try {
                 const res = await fetch('/api/action.php', {
@@ -970,12 +1018,17 @@
                 });
                 const data = await res.json();
                 if (data.status === 'success') {
-                    statusBox.innerHTML = `✅ 证书申请成功！域名已被修改为: <strong>${escapeHtml(domain)}</strong>`;
+                    showToast('✅ SSL 证书申请成功！');
+                    checkCertStatus();
                 } else {
-                    statusBox.innerHTML = `❌ 申请失败: ${escapeHtml(data.message || '请检查域名解析与服务配置')}`;
+                    statusText.innerHTML = `❌ 申请失败`;
+                    detailBox.style.display = 'block';
+                    detailBox.innerHTML = `<span style="color:var(--primary-red);">${escapeHtml(data.message || '请检查域名解析与服务配置')}</span>`;
                 }
             } catch (err) {
-                statusBox.innerHTML = '❌ 请求出错，请检查接口与网络通信';
+                statusText.innerHTML = `❌ 请求出错`;
+                detailBox.style.display = 'block';
+                detailBox.innerHTML = `<span style="color:var(--primary-red);">网络通信失败，请检查后端 API 服务状态</span>`;
             }
         }
 
@@ -1644,6 +1697,7 @@
 
         initTimeSelectOptions();
         fetchData();
+        checkCertStatus();
         setInterval(fetchData, 5000);
     </script>
 </body>
