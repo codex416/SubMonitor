@@ -309,7 +309,6 @@
             background: #f0f6ff;
         }
 
-        /* 封禁按钮与解封按钮样式 */
         .btn-ban {
             background: #fef2f2;
             color: var(--primary-red);
@@ -829,11 +828,19 @@
                     <button class="btn btn-quick" onclick="setQuickDays(7)">近7天</button>
                 </div>
             </div>
+
+            <!-- 反代目标域名（机场域名）修改组件 -->
+            <div class="control-row">
+                <input type="text" id="upstream-input" class="search-input" placeholder="输入反代目标域名 (例如: airport.example.com)">
+                <button class="btn" style="background:#0284c7; color:#ffffff; border:none; font-weight:600;" onclick="submitUpstreamDomain()">更新反代目标域名</button>
+            </div>
+
             <!-- 域名修改与证书申请组件 -->
             <div class="control-row">
                 <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
                 <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
             </div>
+
             <!-- 宝塔式 SSL 证书状态面板 -->
             <div id="cert-status-box" style="display:block; width:100%; font-size:0.78rem; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-family:monospace; word-break:break-all;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -904,7 +911,7 @@
         </div>
     </div>
 
-    <!-- Blacklist Modal (黑名单管理弹窗) -->
+    <!-- Blacklist Modal -->
     <div id="blacklist-modal" class="modal-overlay">
         <div class="modal-card" style="max-width: 580px;">
             <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
@@ -912,7 +919,6 @@
                 <button class="fill-helper-btn" onclick="fetchBlacklistRules()" style="font-size:0.8rem;">🔄 刷新列表</button>
             </div>
             <div class="modal-body" style="gap:14px;">
-                <!-- 手动添加封禁输入框 -->
                 <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
                     <div style="font-size:0.78rem; font-weight:600; color:var(--text-muted); margin-bottom:8px;">主动追加封禁规则</div>
                     <div style="display:flex; gap:6px;">
@@ -926,14 +932,12 @@
                     </div>
                 </div>
 
-                <!-- 分类切换标签 -->
                 <div style="display:flex; gap:6px; border-bottom:1px solid var(--border); padding-bottom:8px;">
                     <button id="bl-tab-ip" class="btn btn-quick active" onclick="switchBlTab('ip')">IP 黑名单 (<span id="bl-count-ip">0</span>)</button>
                     <button id="bl-tab-token" class="btn btn-quick" onclick="switchBlTab('token')">Token 黑名单 (<span id="bl-count-token">0</span>)</button>
                     <button id="bl-tab-ua" class="btn btn-quick" onclick="switchBlTab('ua')">UA 黑名单 (<span id="bl-count-ua">0</span>)</button>
                 </div>
 
-                <!-- 规则列表区域 -->
                 <div style="max-height: 280px; overflow-y: auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;" id="bl-list-container">
                     <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:0.8rem;">加载黑名单中...</div>
                 </div>
@@ -954,6 +958,45 @@
         let activeBlTab = 'ip';
 
         function padZero(n) { return n.toString().padStart(2, '0'); }
+
+        // 获取并填充反代目标域名（机场域名）
+        async function fetchUpstreamDomain() {
+            try {
+                const res = await fetch('/api/action.php?action=get_upstream');
+                const data = await res.json();
+                if (data.status === 'success' && data.upstream) {
+                    document.getElementById('upstream-input').value = data.upstream;
+                }
+            } catch (e) {}
+        }
+
+        // 提交修改反代目标域名
+        async function submitUpstreamDomain() {
+            const input = document.getElementById('upstream-input');
+            const target = input.value.trim();
+
+            if (!target) {
+                showToast('请输入有效的反代目标域名');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'update_upstream', target_domain: target })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    showToast('✅ ' + data.message);
+                    fetchUpstreamDomain();
+                } else {
+                    showToast('❌ ' + (data.message || '更新失败'));
+                }
+            } catch (err) {
+                showToast('网络通信失败，请检查后端 API 服务状态');
+            }
+        }
 
         // 查询宝塔式 SSL 证书状态
         async function checkCertStatus() {
@@ -1250,7 +1293,6 @@
             .catch(() => showToast('封禁请求失败，请检查接口'));
         }
 
-        // --- 黑名单弹窗功能扩展 ---
         function openBlacklistModal() {
             document.getElementById('blacklist-modal').classList.add('active');
             fetchBlacklistRules();
@@ -1697,6 +1739,7 @@
 
         initTimeSelectOptions();
         fetchData();
+        fetchUpstreamDomain();
         checkCertStatus();
         setInterval(fetchData, 5000);
     </script>
