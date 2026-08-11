@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// 统一解析来自前端的 JSON Body、GET 与 POST 参数
+// 统一解析 JSON / GET / POST 参数
 $rawInput = file_get_contents('php://input');
 $inputData = json_decode($rawInput, true) ?: [];
 
@@ -47,30 +47,60 @@ function parseRuleValue($type, $line) {
 
 // ------------------- 路由处理 -------------------
 
-// 1. 获取最新日志（仅取末尾 300 行，解决慢和 UA 缺失问题）
+// 1. 高性能纯 PHP 倒序读取日志 (解决加载慢 & UA 缺失问题)
 if ($action === 'logs' || $action === 'get_logs') {
     $logs = [];
-    if (file_exists($logFile)) {
-        // 使用 tail 指令秒级读取末尾最新日志
-        $cmd = "tail -n 300 " . escapeshellarg($logFile);
-        exec($cmd, $lines);
-        $lines = array_reverse($lines);
+    if (file_exists($logFile) && is_readable($logFile)) {
+        $fp = fopen($logFile, 'r');
+        $size = filesize($logFile);
+        
+        // 仅指针定位读取文件末尾最多 128KB 数据，耗时 < 2ms
+        $readSize = min($size, 131072);
+        if ($readSize > 0) {
+            fseek($fp, $size - $readSize);
+            $data = fread($fp, $readSize);
+            fclose($fp);
 
-        // 匹配 Nginx 默认 combined 格式: 
-        // IP - - [时间] "请求方法 路径 协议" 状态码 发送字节数 "Referer" "User-Agent"
-        $pattern = '/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+)\s+([^\s"]*)[^"]*" (\d+) \d+ "([^"]*)" "([^"]*)"/';
+            $lines = array_filter(explode("\n", $data));
+            $lines = array_reverse($lines); // 最新的放在最前
+            $lines = array_slice($lines, 0, 200); // 截取前 200 条
 
-        foreach ($lines as $line) {
-            if (preg_match($pattern, $line, $m)) {
-                $rawIp   = $m[1];
-                $time    = $m[2];
-                $method  = $m[3];
-                $url     = $m[4];
-                $status  = $m[5];
-                $referer = ($m[6] === '-') ? '' : $m[6];
-                $ua      = ($m[7] === '-') ? '' : $m[7]; // 正确提取 UA
+            foreach ($lines as $line) {
+                // 1. 提取 IP (行首第一个不为空的单词)
+                $ip = strtok($line, ' ');
+                if (!filter_var($ip, FILTER_VALIDATE_IP)) continue;
 
-                // 提取 URL 参数中的 token
+                // 2. 提取时间 [11/Aug/2026...]
+                $time = '';
+                if (preg_match('/\[([^\]]+)\]/', $line, $tm)) {
+                    $time = $tm[1];
+                }
+
+                // 3. 提取所有被双引号包裹的段落 (按顺序: 1.请求 2.Referer 3.UA)
+                preg_match_all('/"([^"]*)"/', $line, $quoteMatches);
+                $quotes = $quoteMatches[1] ?? [];
+
+                $requestStr = $quotes[0] ?? '';
+                $referer    = (isset($quotes[1]) && $quotes[1] !== '-') ? $quotes[1] : '';
+                $ua         = (isset($quotes[2]) && $quotes[2] !== '-') ? $quotes[2] : '';
+
+                // 如果未精确匹配到，兜底抓取行尾最后一对引号的内容作为 UA
+                if (empty($ua) && preg_match('/"([^"]*)"\s*$/', $line, $lastQuote)) {
+                    $ua = $lastQuote[1] !== '-' ? $lastQuote[1] : '';
+                }
+
+                // 4. 解析请求方法与路径
+                $reqParts = explode(' ', $requestStr);
+                $method = count($reqParts) > 0 ? $reqParts[0] : 'GET';
+                $url = count($reqParts) > 1 ? $reqParts[1] : '/';
+
+                // 5. 提取状态码
+                $status = 200;
+                if (preg_match('/"\s+(\d{3})\s+/', $line, $sm)) {
+                    $status = (int)$sm[1];
+                }
+
+                // 6. 提取 Token
                 $token = '';
                 $parsedUrl = parse_url($url);
                 if (isset($parsedUrl['query'])) {
@@ -79,12 +109,12 @@ if ($action === 'logs' || $action === 'get_logs') {
                 }
 
                 $logs[] = [
-                    'ip'      => $rawIp,
+                    'ip'      => $ip,
                     'time'    => $time,
                     'method'  => $method,
                     'path'    => $parsedUrl['path'] ?? $url,
                     'url'     => $url,
-                    'status'  => (int)$status,
+                    'status'  => $status,
                     'token'   => $token,
                     'ua'      => $ua,
                     'referer' => $referer
@@ -204,7 +234,7 @@ if ($action === 'get_domain') {
     exit;
 }
 
-// 6. 更新域名并触发申请
+// 6. 更新域名并触发证书申请
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
