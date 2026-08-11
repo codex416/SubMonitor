@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/auth.php';
 header('Content-Type: application/json; charset=utf-8');
 
 // 统一解析来自前端的 JSON Body、GET 与 POST 参数
