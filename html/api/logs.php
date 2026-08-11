@@ -90,8 +90,8 @@ foreach ($lines as $line) {
         $parsedUrl = parse_url($url);
         $path = $parsedUrl['path'] ?? $url;
 
-        // 严格过滤掉面板自身的 API、首页、静态文件请求，避免日志被自己刷屏
-        if (strpos($url, '/api/') !== false || $path === '/' || $path === '/index.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff|woff2)$/i', $path)) {
+        // 严格过滤掉面板自身的 API、首页、静态文件请求
+        if (strpos($url, '/api/') !== false || $path === '/' || $path === '/index.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff|woff2|env.*)$/i', $path)) {
             continue;
         }
 
@@ -106,11 +106,12 @@ foreach ($lines as $line) {
             }
         }
 
-        // 2. 如果 Query 中没有，尝试从路径中提取 (例如 /sub/token 或 /uuid)
+        // 2. 如果 Query 中没有，尝试从路径中提取，并严格排除带有点（如 .env、.git）或常见敏感词的路径
         if ($token === '-' && $path !== '/' && $path !== '') {
             $segments = explode('/', trim($path, '/'));
             foreach ($segments as $seg) {
-                if (strlen($seg) >= 8 && !in_array($seg, ['sub', 'api', 'static', 'assets'])) {
+                // 排除包含点号的文件名（如 .env.dev）、短字符串以及黑名单词汇
+                if (strpos($seg, '.') === false && strlen($seg) >= 8 && !in_array($seg, ['sub', 'api', 'static', 'assets', 'admin', 'login'])) {
                     $token = $seg;
                     break;
                 }
