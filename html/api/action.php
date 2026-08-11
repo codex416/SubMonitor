@@ -344,7 +344,6 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     $confPath = getNginxConfPath();
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        // 替换所有 server_name
         $newConf = preg_replace('/\bserver_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
         
         if (!safeWriteFile($confPath, $newConf)) {
@@ -379,9 +378,9 @@ if ($action === 'get_upstream') {
     $targetDomain = '';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        if (preg_match('/location\s+\/sub\/\s*\{[^}]*proxy_ssl_name\s+([^;]+);/s', $conf, $matches)) {
+        if (preg_match('/location\s+\/\s*\{[^}]*proxy_ssl_name\s+([^;]+);/s', $conf, $matches)) {
             $targetDomain = trim($matches[1]);
-        } elseif (preg_match('/location\s+\/sub\/\s*\{[^}]*proxy_pass\s+https?:\/\/([^\/;\s]+)/s', $conf, $matches)) {
+        } elseif (preg_match('/location\s+\/\s*\{[^}]*proxy_pass\s+https?:\/\/([^\/;\s]+)/s', $conf, $matches)) {
             $targetDomain = trim($matches[1]);
         }
     }
@@ -397,7 +396,6 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    // 过滤 http://, https:// 前缀及末尾斜杠
     $newTarget = preg_replace('/^https?:\/\//i', '', $newTarget);
     $newTarget = rtrim($newTarget, '/');
 
@@ -409,51 +407,44 @@ if ($action === 'update_upstream') {
 
     $conf = file_get_contents($confPath);
 
-    // 精确匹配 location /sub/ { ... } 规则块
-    if (preg_match('/(location\s+\/sub\/\s*\{)([\s\S]*?)(\})/i', $conf, $matches)) {
+    if (preg_match('/(location\s+\/\s*\{)([\s\S]*?)(\n\s*location\s+~)/i', $conf, $matches)) {
         $subBlock = $matches[2];
 
-        // 1. 替换 proxy_pass
         if (preg_match('/proxy_pass\s+[^;]+;/', $subBlock)) {
             $subBlock = preg_replace('/proxy_pass\s+[^;]+;/', "proxy_pass https://{$newTarget};", $subBlock);
         } else {
             $subBlock .= "\n        proxy_pass https://{$newTarget};";
         }
 
-        // 2. 替换 Host 请求头
         if (preg_match('/proxy_set_header\s+Host\s+[^;]+;/', $subBlock)) {
             $subBlock = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/', "proxy_set_header Host {$newTarget};", $subBlock);
         } else {
             $subBlock .= "\n        proxy_set_header Host {$newTarget};";
         }
 
-        // 3. 替换 proxy_ssl_name (正则排除 proxy_ssl_server_name)
         if (preg_match('/proxy_ssl_name\s+[^;]+;/', $subBlock)) {
             $subBlock = preg_replace('/proxy_ssl_name\s+[^;]+;/', "proxy_ssl_name {$newTarget};", $subBlock);
         } else {
             $subBlock .= "\n        proxy_ssl_name {$newTarget};";
         }
 
-        // 4. 确保 proxy_ssl_server_name on; 存在
         if (!preg_match('/proxy_ssl_server_name\s+on;/', $subBlock)) {
             $subBlock .= "\n        proxy_ssl_server_name on;";
         }
 
-        // 拼接回原配置文件
-        $newConf = str_replace($matches[0], $matches[1] . $subBlock . "\n    " . $matches[3], $conf);
+        $newConf = str_replace($matches[0], $matches[1] . $subBlock . $matches[3], $conf);
 
         if (!safeWriteFile($confPath, $newConf)) {
             echo json_encode(['status' => 'error', 'message' => "写入失败！请检查文件写权限"]);
             exit;
         }
 
-        // 写入重载信号，通知后台 entrypoint.sh 触发 safe_nginx_reload
         safeWriteFile($reloadFlag, time());
 
         echo json_encode(['status' => 'success', 'message' => "已成功将反代目标替换为机场域名: {$newTarget}"]);
         exit;
     } else {
-        echo json_encode(['status' => 'error', 'message' => 'Nginx 配置中未查找到 location /sub/ 代理规则块']);
+        echo json_encode(['status' => 'error', 'message' => 'Nginx 配置中未查找到根目录代理规则块']);
         exit;
     }
 }
