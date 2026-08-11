@@ -22,7 +22,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
     if (file_exists($login_file)) {
         $content = file_get_contents($login_file);
         
-        // 1. 提取当前的 $SECRET 值用于校验旧密码
+        // 提取当前的 $SECRET 值用于校验旧密码
         $pattern = "/\\\$SECRET\\s*=\\s*['\"](.*?)['\"];/";
         if (preg_match($pattern, $content, $matches)) {
             $stored_password = $matches[1];
@@ -37,7 +37,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
             exit;
         }
         
-        // 2. 替换为新密码
+        // 替换为新密码
         $replacement = "\$SECRET = '" . addslashes($new_password) . "';";
         $new_content = preg_replace($pattern, $replacement, $content);
         
