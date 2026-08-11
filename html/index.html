@@ -1054,7 +1054,7 @@
             }
         }
 
-        // 【新增】提交修改管理员密码
+        // 【已修改】提交修改管理员密码（包含旧密码收集校验）
         async function submitChangePassword() {
             const input = document.getElementById('new-password-input');
             const newPassword = input.value.trim();
@@ -1064,7 +1064,14 @@
                 return;
             }
 
+            const currentPassword = prompt('请输入当前的管理员密码：');
+            if (!currentPassword) {
+                showToast('必须输入当前密码才能修改');
+                return;
+            }
+
             const formData = new FormData();
+            formData.append('current_password', currentPassword);
             formData.append('new_password', newPassword);
 
             try {
