@@ -188,9 +188,9 @@ if ($action === 'get_upstream') {
     $targetDomain = '';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        if (preg_match('/location\s+\/\s*\{[^}]*proxy_ssl_name\s+([^;]+);/s', $conf, $matches)) {
+        if (preg_match('/location\s+@proxy\s*\{[^}]*proxy_ssl_name\s+([^;]+);/s', $conf, $matches)) {
             $targetDomain = trim($matches[1]);
-        } elseif (preg_match('/location\s+\/\s*\{[^}]*proxy_pass\s+https?:\/\/([^\/;\s]+)/s', $conf, $matches)) {
+        } elseif (preg_match('/location\s+@proxy\s*\{[^}]*proxy_pass\s+https?:\/\/([^\/;\s]+)/s', $conf, $matches)) {
             $targetDomain = trim($matches[1]);
         }
     }
@@ -198,7 +198,7 @@ if ($action === 'get_upstream') {
     exit;
 }
 
-// 9. 修改反代目标（精准匹配 location / 中的代理块）
+// 9. 修改反代目标（精准匹配 location @proxy 块）
 if ($action === 'update_upstream') {
     $newTarget = trim($inputData['target_domain'] ?? ($_POST['target_domain'] ?? ''));
     if (empty($newTarget)) {
@@ -216,19 +216,19 @@ if ($action === 'update_upstream') {
 
     $conf = file_get_contents($confPath);
 
-    if (preg_match('/(location\s+\/\s*\{)([\s\S]*?)(\n\s*location\s+~)/i', $conf, $matches)) {
+    if (preg_match('/(location\s+@proxy\s*\{)([\s\S]*?)(\n\s*location\s+~)/i', $conf, $matches)) {
         $subBlock = $matches[2];
 
         $subBlock = preg_replace('/proxy_pass\s+[^;]+;/', "proxy_pass https://{$newTarget};", $subBlock);
-        if (!str_contains($subBlock, 'proxy_pass')) $subBlock .= "\n            proxy_pass https://{$newTarget};";
+        if (!str_contains($subBlock, 'proxy_pass')) $subBlock .= "\n        proxy_pass https://{$newTarget};";
 
         $subBlock = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/', "proxy_set_header Host {$newTarget};", $subBlock);
-        if (!str_contains($subBlock, 'proxy_set_header Host')) $subBlock .= "\n            proxy_set_header Host {$newTarget};";
+        if (!str_contains($subBlock, 'proxy_set_header Host')) $subBlock .= "\n        proxy_set_header Host {$newTarget};";
 
         $subBlock = preg_replace('/proxy_ssl_name\s+[^;]+;/', "proxy_ssl_name {$newTarget};", $subBlock);
-        if (!str_contains($subBlock, 'proxy_ssl_name')) $subBlock .= "\n            proxy_ssl_name {$newTarget};";
+        if (!str_contains($subBlock, 'proxy_ssl_name')) $subBlock .= "\n        proxy_ssl_name {$newTarget};";
 
-        if (!str_contains($subBlock, 'proxy_ssl_server_name on;')) $subBlock .= "\n            proxy_ssl_server_name on;";
+        if (!str_contains($subBlock, 'proxy_ssl_server_name on;')) $subBlock .= "\n        proxy_ssl_server_name on;";
 
         $newConf = str_replace($matches[0], $matches[1] . $subBlock . $matches[3], $conf);
 
@@ -241,7 +241,7 @@ if ($action === 'update_upstream') {
         echo json_encode(['status' => 'success', 'message' => "已成功将反代目标替换为: {$newTarget}"]);
         exit;
     } else {
-        echo json_encode(['status' => 'error', 'message' => '未找到根目录代理规则块']);
+        echo json_encode(['status' => 'error', 'message' => '未找到 @proxy 配置块']);
         exit;
     }
 }
