@@ -6,10 +6,10 @@ services:
     restart: always
     volumes:
       - ./html:/var/www/html
-      - ./nginx:/etc/nginx/conf.d # 改为挂载整个目录，防止 Docker 单文件写入锁死
+      - ./nginx:/etc/nginx/conf.d
       - ./rules:/etc/nginx/rules
       - ./rules:/var/www/html/rules
-      - ./ssl:/etc/nginx/ssl # 补上 SSL 挂载，让 PHP 能读取到证书文件
+      - ./ssl:/etc/nginx/ssl
       - log-data:/var/log/nginx
 
   nginx:
@@ -17,19 +17,22 @@ services:
     container_name: submonitor-nginx
     restart: always
     ports:
-      - "80:80"      # HTTP 端口
-      - "443:443"    # HTTPS 端口
+      - "80:80"
+      - "443:443"
     volumes:
       - ./html:/var/www/html
-      - ./nginx:/etc/nginx/conf.d # 保持与 PHP 挂载目录一致
+      - ./nginx:/etc/nginx/conf.d
       - ./rules:/etc/nginx/rules
       - ./ssl:/etc/nginx/ssl
       - ./entrypoint.sh:/entrypoint.sh
       - log-data:/var/log/nginx
     depends_on:
       - php
-    # 【已修改】启动时自动赋予权限并运行，一劳永逸解决权限丢失问题
-    entrypoint: ["sh", "-c", "chmod +x /entrypoint.sh && /entrypoint.sh"]
+    # 【修复版】在入口处强制修复所有挂载目录的权限，确保面板随时有权写入配置和申请证书
+    entrypoint: [
+      "sh", "-c", 
+      "chmod +x /entrypoint.sh && chmod -R 777 /var/www/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
+    ]
 
 volumes:
   log-data:
