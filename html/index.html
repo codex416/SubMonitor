@@ -862,6 +862,12 @@
                 <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
             </div>
 
+            <!-- 【新增】修改管理员密码组件 -->
+            <div class="control-row">
+                <input type="password" id="new-password-input" class="search-input" placeholder="输入新的管理员密码">
+                <button class="btn" style="background:var(--primary-green); color:#ffffff; border:none; font-weight:600;" onclick="submitChangePassword()">修改管理员密码</button>
+            </div>
+
             <!-- 宝塔式 SSL 证书状态面板 -->
             <div id="cert-status-box" style="display:block; width:100%; font-size:0.78rem; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-family:monospace; word-break:break-all;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
@@ -1045,6 +1051,37 @@
                 }
             } catch (err) {
                 showToast('网络通信失败，请检查后端 API 服务状态');
+            }
+        }
+
+        // 【新增】提交修改管理员密码
+        async function submitChangePassword() {
+            const input = document.getElementById('new-password-input');
+            const newPassword = input.value.trim();
+
+            if (!newPassword) {
+                showToast('请输入新的管理员密码');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('new_password', newPassword);
+
+            try {
+                const res = await fetch('api/change_password.php', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await res.json();
+                showToast(data.message || '操作完成');
+                if (data.code === 200) {
+                    input.value = '';
+                    setTimeout(() => {
+                        window.location.href = 'login.html'; // 修改成功后跳转回登录页
+                    }, 1500);
+                }
+            } catch (err) {
+                showToast('修改密码请求失败，请检查接口');
             }
         }
 
@@ -1783,7 +1820,6 @@
             }
         }
 
-        // 【新增】将原先直接执行的初始化逻辑封装进 initializeApp，由鉴权通过后触发
         function initializeApp() {
             initTimeSelectOptions();
             fetchData();
