@@ -80,7 +80,7 @@ $result = [];
 $targetTimeZone = new DateTimeZone('Asia/Shanghai'); // 设置目标时区为 UTC+8
 
 foreach ($lines as $line) {
-    if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/\d\.\d" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
+    if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
         $ip       = $matches[1];
         $timeRaw  = $matches[2];
         $url      = $matches[3];
