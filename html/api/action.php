@@ -376,7 +376,7 @@ if ($action === 'get_upstream') {
     exit;
 }
 
-// 9. 修改反代目标（精准匹配 location @proxy 块）
+// 9. 修改反代目标（精准同步修改 proxy_pass、Host 以及 proxy_ssl_name）
 if ($action === 'update_upstream') {
     $newTarget = trim($inputData['target_domain'] ?? ($_POST['target_domain'] ?? ''));
     if (empty($newTarget)) {
@@ -398,7 +398,8 @@ if ($action === 'update_upstream') {
         $subBlock = $matches[2];
 
         $subBlock = preg_replace('/proxy_pass\s+[^;]+;/', "proxy_pass https://{$newTarget};", $subBlock);
-        if (!str_contains($subBlock, 'proxy_pass')) $subBlock .= "\n        proxy_pass https://{$newTarget};";
+        $subBlock = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/', "proxy_set_header Host {$newTarget};", $subBlock);
+        $subBlock = preg_replace('/proxy_ssl_name\s+[^;]+;/', "proxy_ssl_name {$newTarget};", $subBlock);
 
         $newConf = str_replace($matches[0], $matches[1] . $subBlock . $matches[3], $conf);
 
