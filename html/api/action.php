@@ -19,6 +19,37 @@ $logFile = file_exists('/var/log/nginx/sub_access.log')
 
 // ------------------- 辅助函数 -------------------
 
+/**
+ * 安全写入文件并自动赋予可读写权限（0666/0777）
+ */
+function safeWriteFile($filePath, $content, $append = false) {
+    $dir = dirname($filePath);
+    
+    // 如果目录不存在，尝试递归创建并赋予读写权限
+    if (!is_dir($dir)) {
+        @mkdir($dir, 0777, true);
+        @chmod($dir, 0777);
+    } else {
+        @chmod($dir, 0777);
+    }
+
+    // 如果文件已存在，尝试提升可写入权限
+    if (file_exists($filePath)) {
+        @chmod($filePath, 0666);
+    }
+
+    $flags = $append ? FILE_APPEND : 0;
+    $result = @file_put_contents($filePath, $content, $flags);
+
+    // 写入成功后赋予全公开读写权限，防止后续读取或更新失败
+    if ($result !== false) {
+        @chmod($filePath, 0666);
+        return true;
+    }
+
+    return false;
+}
+
 function formatRule($type, $value) {
     switch ($type) {
         case 'ip':
@@ -50,7 +81,7 @@ function parseRuleValue($type, $line) {
 }
 
 /**
- * 解析并获取当前 SSL 证书详细状态（宝塔面板风格数据源）
+ * 解析并获取当前 SSL 证书详细状态
  */
 function getSslCertificateInfo() {
     $certPath = '/etc/nginx/ssl/cert.pem';
@@ -64,7 +95,6 @@ function getSslCertificateInfo() {
                 $validTo = $certData['validTo_time_t'] ?? 0;
                 $daysLeft = ceil(($validTo - time()) / 86400);
                 
-                // 提取域名 (优先提取主题扩展 SAN 或 通用名 CN)
                 $domain = $certData['subject']['CN'] ?? '';
                 if (isset($certData['extensions']['subjectAltName'])) {
                     $sans = explode(',', $certData['extensions']['subjectAltName']);
@@ -76,7 +106,6 @@ function getSslCertificateInfo() {
                     }
                 }
 
-                // 提取签发机构名称
                 $issuer = $certData['issuer']['O'] ?? ($certData['issuer']['CN'] ?? 'Let\'s Encrypt');
 
                 return [
@@ -146,17 +175,14 @@ function getSslCertificateInfo() {
 
 // ------------------- 路由处理 -------------------
 
-// 1. 获取最新日志（仅取末尾 300 行，解决慢和 UA 缺失问题）
+// 1. 获取最新日志
 if ($action === 'logs' || $action === 'get_logs') {
     $logs = [];
     if (file_exists($logFile)) {
-        // 使用 tail 指令秒级读取末尾最新日志
         $cmd = "tail -n 300 " . escapeshellarg($logFile);
         exec($cmd, $lines);
         $lines = array_reverse($lines);
 
-        // 匹配 Nginx 默认 combined 格式: 
-        // IP - - [时间] "请求方法 路径 协议" 状态码 发送字节数 "Referer" "User-Agent"
         $pattern = '/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+)\s+([^\s"]*)[^"]*" (\d+) \d+ "([^"]*)" "([^"]*)"/';
 
         foreach ($lines as $line) {
@@ -167,9 +193,8 @@ if ($action === 'logs' || $action === 'get_logs') {
                 $url     = $m[4];
                 $status  = $m[5];
                 $referer = ($m[6] === '-') ? '' : $m[6];
-                $ua      = ($m[7] === '-') ? '' : $m[7]; // 正确提取 UA
+                $ua      = ($m[7] === '-') ? '' : $m[7];
 
-                // 提取 URL 参数中的 token
                 $token = '';
                 $parsedUrl = parse_url($url);
                 if (isset($parsedUrl['query'])) {
@@ -240,8 +265,11 @@ if ($action === 'ban') {
     $existing = file_exists($targetFile) ? file_get_contents($targetFile) : '';
 
     if (!str_contains($existing, $ruleLine)) {
-        file_put_contents($targetFile, $ruleLine . "\n", FILE_APPEND);
-        touch($reloadFlag);
+        if (!safeWriteFile($targetFile, $ruleLine . "\n", true)) {
+            echo json_encode(['status' => 'error', 'message' => "无权限写入规则文件: {$targetFile}"]);
+            exit;
+        }
+        safeWriteFile($reloadFlag, time());
     }
 
     echo json_encode(['status' => 'success', 'message' => "已成功封禁 {$type}: {$value}"]);
@@ -275,14 +303,17 @@ if ($action === 'unban') {
         $newLines[] = $line;
     }
 
-    file_put_contents($targetFile, implode("\n", $newLines) . "\n");
-    touch($reloadFlag);
+    if (!safeWriteFile($targetFile, implode("\n", $newLines) . "\n")) {
+        echo json_encode(['status' => 'error', 'message' => "无权限更新文件: {$targetFile}"]);
+        exit;
+    }
+    safeWriteFile($reloadFlag, time());
 
     echo json_encode(['status' => 'success', 'message' => '解封成功']);
     exit;
 }
 
-// 5. 新增路由：实时查询 SSL 证书状态
+// 5. 实时查询 SSL 证书状态
 if ($action === 'cert_status') {
     echo json_encode(getSslCertificateInfo());
     exit;
@@ -320,11 +351,28 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
         $newConf = preg_replace('/server_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
-        file_put_contents($confPath, $newConf);
+        
+        // 1. 修改 Nginx 配置文件
+        if (!safeWriteFile($confPath, $newConf)) {
+            echo json_encode([
+                'status'  => 'error', 
+                'message' => "权限不足！PHP 无法写入 Nginx 配置文件: {$confPath}。请在服务器执行 docker 提升权限。"
+            ]);
+            exit;
+        }
     }
 
-    file_put_contents('/etc/nginx/rules/.cert_flag', $newDomain);
-    file_put_contents('/etc/nginx/rules/cert_status.json', json_encode([
+    // 2. 写入触发标志文件
+    if (!safeWriteFile('/etc/nginx/rules/.cert_flag', $newDomain)) {
+        echo json_encode([
+            'status'  => 'error', 
+            'message' => "权限不足！无法在 /etc/nginx/rules/ 目录创建标志文件。"
+        ]);
+        exit;
+    }
+
+    // 3. 更新状态文件
+    safeWriteFile('/etc/nginx/rules/cert_status.json', json_encode([
         'status' => 'processing',
         'msg'    => '已提交申请，后台正在联系 Let\'s Encrypt 签发证书...'
     ]));
