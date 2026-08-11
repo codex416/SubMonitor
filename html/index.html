@@ -2,329 +2,1649 @@
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>FanHua-VPN 管理面板</title>
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.10.0/font/bootstrap-icons.css" rel="stylesheet">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#f8fafc">
+    <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+    <meta http-equiv="Pragma" content="no-cache">
+    <meta http-expires="0">
+    <title>SubMonitor - 订阅监控</title>
+    
     <style>
         :root {
-            --primary-color: #4a90e2;
-            --bg-color: #f4f6f9;
+            --bg: #f8fafc;
+            --card-bg: #ffffff;
+            --border: #e2e8f0;
+            --text-primary: #0f172a;
+            --text-muted: #64748b;
+            --primary-blue: #4f46e5;
+            --primary-green: #16a34a;
+            --primary-red: #dc2626;
         }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+
+        html, body { width: 100%; max-width: 100vw; overflow-x: hidden; }
+
         body {
-            background-color: var(--bg-color);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg);
+            background-image: radial-gradient(#e2e8f0 1.2px, transparent 1.2px);
+            background-size: 18px 18px;
+            color: var(--text-primary);
+            padding: 16px 12px 100px 12px;
+            min-height: 100vh;
         }
-        .main-card {
-            border: none;
+
+        .container { max-width: 1200px; margin: 0 auto; width: 100%; overflow: hidden; }
+
+        .top-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 16px;
+        }
+
+        .brand {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .status-dot {
+            width: 9px;
+            height: 9px;
+            background-color: #22c55e;
+            border-radius: 50%;
+            display: inline-block;
+            box-shadow: 0 0 8px rgba(34, 197, 94, 0.6);
+        }
+
+        .brand-title {
+            font-size: 1.2rem;
+            font-weight: 700;
+            color: #0f172a;
+            letter-spacing: -0.3px;
+        }
+
+        .last-update { font-size: 0.75rem; color: var(--text-muted); }
+
+        .analytics-grid {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 12px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .analytics-grid { grid-template-columns: 1fr; }
+        }
+
+        .analytics-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
             border-radius: 12px;
-            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.08);
-            background: #fff;
-            margin-top: 2rem;
-            margin-bottom: 2rem;
+            padding: 12px 14px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            display: flex;
+            flex-direction: column;
+            height: 320px;
         }
-        .nav-pills .nav-link {
-            color: #555;
+
+        .analytics-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 8px;
+            padding-bottom: 8px;
+            border-bottom: 1px dashed var(--border);
+        }
+
+        .analytics-title {
+            font-size: 0.88rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .analytics-list {
+            overflow-y: auto;
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            padding-right: 4px;
+        }
+
+        .analytics-list::-webkit-scrollbar { width: 4px; }
+        .analytics-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+
+        .analytics-item {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.78rem;
+            padding: 6px 0;
+            border-bottom: 1px solid #f8fafc;
+        }
+
+        .analytics-item:last-child { border-bottom: none; }
+
+        .item-left {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .rank-num {
+            font-size: 0.75rem;
+            font-weight: 700;
+            color: var(--text-muted);
+            width: 14px;
+            text-align: center;
+            flex-shrink: 0;
+        }
+
+        .item-main {
+            display: flex;
+            flex-direction: column;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .item-title-row {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            min-width: 0;
+        }
+
+        .item-title {
+            font-weight: 600;
+            color: var(--text-primary);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            font-family: monospace;
+        }
+
+        .item-sub {
+            font-size: 0.68rem;
+            color: var(--text-muted);
+        }
+
+        .item-right {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            text-align: right;
+            flex-shrink: 0;
+            margin-left: 8px;
+        }
+
+        .count-badge {
+            font-weight: 700;
+            color: var(--primary-blue);
+            font-size: 0.8rem;
+        }
+
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+            margin-bottom: 20px;
+        }
+
+        @media (max-width: 640px) {
+            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+        }
+
+        .stat-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px 14px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+
+        .stat-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
+        .stat-number { font-size: 1.4rem; font-weight: 700; }
+        .stat-number.blue { color: var(--primary-blue); }
+        .stat-number.green { color: var(--primary-green); }
+        .stat-number.red { color: var(--primary-red); }
+
+        .section-header { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+
+        .control-panel {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px 12px 0 0;
+            padding: 12px 14px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            border-bottom: none;
+            width: 100%;
+        }
+
+        .control-row {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 8px;
+            align-items: center;
+            width: 100%;
+        }
+
+        .search-input {
+            flex: 1;
+            min-width: 180px;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 10px 20px;
+            font-size: 0.82rem;
+            outline: none;
+            color: var(--text-primary);
+        }
+
+        .search-input:focus { border-color: var(--primary-blue); background: #fff; }
+
+        .time-trigger-btn {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            color: var(--text-primary);
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .time-trigger-btn:hover {
+            border-color: var(--primary-blue);
+            background: #f0f6ff;
+            color: var(--primary-blue);
+        }
+
+        .time-trigger-btn .tag { font-weight: 600; color: var(--primary-blue); }
+
+        .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+            align-items: center;
+            max-width: 100%;
+        }
+
+        .btn {
+            background: #f1f5f9;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 6px 12px;
+            border-radius: 8px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn:hover { background: #e2e8f0; }
+
+        .btn-quick {
+            background: #ffffff;
+            color: var(--text-muted);
+            border: 1px solid var(--border);
+            font-size: 0.78rem;
+            padding: 5px 10px;
+            flex-shrink: 0;
+        }
+
+        .btn-quick:hover, .btn-quick.active {
+            color: var(--primary-blue);
+            border-color: var(--primary-blue);
+            background: #f0f6ff;
+        }
+
+        /* 封禁按钮与解封按钮样式 */
+        .btn-ban {
+            background: #fef2f2;
+            color: var(--primary-red);
+            border: 1px solid #fecaca;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+            display: inline-flex;
+            align-items: center;
+            gap: 2px;
+        }
+
+        .btn-ban:hover {
+            background: #dc2626;
+            color: #ffffff;
+            border-color: #dc2626;
+        }
+
+        .btn-unban {
+            background: #f0fdf4;
+            color: var(--primary-green);
+            border: 1px solid #bbf7d0;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-size: 0.72rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .btn-unban:hover {
+            background: #16a34a;
+            color: #ffffff;
+            border-color: #16a34a;
+        }
+
+        .ban-actions {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+
+        .modal-overlay {
+            position: fixed;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(15, 23, 42, 0.45);
+            backdrop-filter: blur(6px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            padding: 16px;
+        }
+
+        .modal-overlay.active { display: flex; }
+
+        .modal-card {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            border-radius: 16px;
+            width: 100%;
+            max-width: 440px;
+            padding: 20px 22px;
+            box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box;
+            animation: modalFadeIn 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; transform: scale(0.96) translateY(8px); }
+            to { opacity: 1; transform: scale(1) translateY(0); }
+        }
+
+        .modal-header { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; }
+
+        .modal-body { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; width: 100%; }
+
+        .input-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+
+        .input-label-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        .input-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+
+        .fill-helper-btn {
+            font-size: 0.72rem;
+            color: var(--primary-blue);
+            background: transparent;
+            border: none;
+            cursor: pointer;
             font-weight: 500;
         }
-        .nav-pills .nav-link.active {
-            background-color: var(--primary-color);
+        .fill-helper-btn:hover { text-decoration: underline; }
+
+        .picker-combo-row {
+            display: flex;
+            gap: 6px;
+            align-items: center;
+            width: 100%;
         }
-        .status-badge {
-            font-size: 0.85rem;
-            padding: 6px 12px;
-            border-radius: 20px;
-        }
-        .toast-container {
-            position: fixed;
-            top: 20px;
-            right: 20px;
-            z-index: 9999;
-        }
-        .status-box {
+
+        .date-picker-input {
+            flex: 2;
+            padding: 8px 10px;
+            border: 1px solid var(--border);
             border-radius: 8px;
-            padding: 12px 16px;
-            background-color: #f8f9fa;
-            border-left: 4px solid var(--primary-color);
-            margin-top: 15px;
+            font-size: 0.85rem;
+            background: #f8fafc;
+            color: var(--text-primary);
+            outline: none;
+            cursor: pointer;
         }
+
+        .time-select {
+            flex: 1;
+            padding: 8px 4px;
+            border: 1px solid var(--border);
+            border-radius: 8px;
+            font-size: 0.82rem;
+            background: #f8fafc;
+            color: var(--text-primary);
+            outline: none;
+            cursor: pointer;
+            text-align: center;
+        }
+
+        .date-picker-input:focus, .time-select:focus {
+            border-color: var(--primary-blue);
+            background: #fff;
+        }
+
+        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+
+        .btn-primary {
+            background: var(--primary-blue);
+            color: #ffffff;
+            border: none;
+            padding: 9px 22px;
+            border-radius: 10px;
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background 0.15s ease;
+        }
+
+        .btn-primary:hover { background: #3730a3; }
+
+        .table-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 0 0 12px 12px;
+            overflow: hidden;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.02);
+            width: 100%;
+        }
+
+        .table-wrapper { overflow-x: auto; width: 100%; }
+
+        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+
+        th {
+            background: #f8fafc;
+            padding: 12px 16px;
+            color: var(--text-muted);
+            font-weight: 600;
+            font-size: 0.78rem;
+            border-bottom: 1px solid var(--border);
+            white-space: nowrap;
+        }
+
+        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
+        tr:last-child td { border-bottom: none; }
+        tr:hover { background-color: #f8fafc; }
+
+        .pill-box {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            background: #f1f5f9;
+            border: 1px solid #e2e8f0;
+            padding: 3px 8px;
+            border-radius: 6px;
+            font-family: monospace;
+            font-size: 0.8rem;
+            max-width: 100%;
+            min-width: 0;
+            overflow: hidden;
+            cursor: pointer;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .pill-box span {
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+            flex: 1;
+        }
+
+        .pill-box.expanded {
+            flex-wrap: wrap;
+            white-space: normal;
+            word-break: break-all;
+        }
+
+        .pill-box.expanded span {
+            white-space: normal;
+            word-break: break-all;
+            overflow: visible;
+            text-overflow: clip;
+        }
+
+        .btn-copy-icon {
+            background: transparent;
+            border: none;
+            color: #64748b;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            padding: 2px;
+            border-radius: 4px;
+            flex-shrink: 0;
+        }
+
+        .btn-copy-icon:hover { color: var(--primary-blue); background: #e2e8f0; }
+        .btn-copy-icon svg { width: 13px; height: 13px; stroke-width: 2; }
+
+        .ip-sub {
+            font-size: 0.73rem;
+            color: var(--text-muted);
+            margin-top: 3px;
+            text-align: left;
+            width: 100%;
+            line-height: 1.35;
+            word-break: break-all;
+            overflow-wrap: anywhere;
+        }
+
+        .badge {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 38px;
+            padding: 2px 7px;
+            border-radius: 10px;
+            font-weight: 600;
+            font-size: 0.75rem;
+            font-family: monospace;
+            flex-shrink: 0;
+        }
+
+        .badge-200 { background: #dcfce7; color: #15803d; }
+        .badge-400 { background: #fef3c7; color: #b45309; }
+        .badge-401 { background: #fee2e2; color: #991b1b; }
+        .badge-403 { background: #fee2e2; color: #b91c1c; }
+        .badge-404 { background: #f3e8ff; color: #6b21a8; }
+        .badge-429 { background: #ffedd5; color: #c2410c; }
+        .badge-500 { background: #fecdd3; color: #9f1239; }
+        .badge-other { background: #e2e8f0; color: #475569; }
+
+        .remark-text { font-size: 0.8rem; font-weight: 500; flex-shrink: 0; }
+
+        .ua-text {
+            max-width: 220px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+        }
+
+        .empty-state { padding: 40px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+
+        @media (max-width: 768px) {
+            .control-panel {
+                border-radius: 12px;
+                margin-bottom: 12px;
+                border-bottom: 1px solid var(--border);
+            }
+
+            .control-row { flex-direction: column; align-items: stretch; }
+
+            .btn-group {
+                overflow-x: auto;
+                white-space: nowrap;
+                width: 100%;
+                padding-bottom: 4px;
+                -webkit-overflow-scrolling: touch;
+                flex-wrap: nowrap;
+            }
+
+            .time-trigger-btn { width: 100%; justify-content: space-between; }
+
+            .table-card { background: transparent; border: none; box-shadow: none; overflow: hidden; width: 100%; }
+            .table-wrapper { overflow: hidden; width: 100%; }
+            
+            table, tbody { display: block; width: 100%; box-sizing: border-box; }
+            thead { display: none; }
+
+            tbody { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+
+            tr.m-card {
+                display: block !important;
+                background: var(--card-bg) !important;
+                border: 1px solid var(--border) !important;
+                border-radius: 12px !important;
+                padding: 14px !important;
+                box-shadow: 0 1px 3px rgba(0,0,0,0.02) !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+
+            tr.m-card > td {
+                display: block !important;
+                width: 100% !important;
+                padding: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+
+            .m-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding-bottom: 10px;
+                border-bottom: 1px solid #f1f5f9;
+                margin-bottom: 10px;
+                width: 100%;
+            }
+
+            .m-time { font-size: 0.8rem; font-weight: 600; color: #334155; }
+            .m-status-group { display: flex; align-items: center; gap: 6px; }
+
+            .m-card-body {
+                display: flex;
+                flex-direction: column;
+                gap: 10px;
+                width: 100%;
+            }
+
+            .m-row {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            .m-label {
+                font-size: 0.75rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                flex-shrink: 0;
+                margin-top: 3px;
+            }
+
+            .m-value {
+                font-size: 0.8rem;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-end !important;
+                text-align: right !important;
+                min-width: 0 !important;
+                max-width: 70% !important;
+                box-sizing: border-box !important;
+            }
+
+            .ip-sub {
+                font-size: 0.73rem;
+                color: var(--text-muted);
+                margin-top: 4px;
+                text-align: right !important;
+                width: 100% !important;
+                display: block !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+                cursor: pointer;
+            }
+
+            .ip-sub.expanded {
+                white-space: normal !important;
+                word-break: break-all !important;
+                overflow: visible !important;
+            }
+
+            .m-ua-box {
+                margin-top: 10px;
+                padding-top: 8px;
+                border-top: 1px dashed #f1f5f9;
+                font-size: 0.73rem;
+                color: var(--text-muted);
+                line-height: 1.4;
+                word-break: break-all !important;
+                overflow-wrap: anywhere !important;
+                white-space: normal;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                cursor: pointer;
+                width: 100% !important;
+                text-align: left !important;
+            }
+
+            .m-ua-box.expanded {
+                display: block !important;
+                overflow: visible !important;
+            }
+        }
+
+        .toast {
+            position: fixed;
+            bottom: 24px;
+            left: 50%;
+            transform: translateX(-50%) translateY(100px);
+            background: #0f172a;
+            color: #fff;
+            padding: 8px 18px;
+            border-radius: 20px;
+            font-size: 0.8rem;
+            opacity: 0;
+            transition: all 0.25s cubic-bezier(0.18, 0.89, 0.32, 1.28);
+            pointer-events: none;
+            z-index: 100001;
+        }
+        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
     </style>
 </head>
 <body>
+    <div class="container">
+        <div class="top-bar">
+            <div class="brand">
+                <span class="status-dot"></span>
+                <span class="brand-title">SubMonitor</span>
+            </div>
+            <div class="last-update">最后更新: <span id="update-time">--:--:--</span></div>
+        </div>
 
-<div class="container">
-    <div class="row justify-content-center">
-        <div class="col-lg-10">
-            <div class="card main-card p-4">
-                <div class="d-flex justify-content-between align-items-center mb-4">
-                    <h3 class="m-0 text-primary"><i class="bi bi-shield-lock-fill me-2"></i>FanHua-VPN 管理面板</h3>
-                    <span id="system-status" class="badge bg-secondary status-badge">检查服务状态中...</span>
+        <div class="stats-grid">
+            <div class="stat-card">
+                <div class="stat-label">总请求节点</div>
+                <div class="stat-number" id="stat-total">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">独立 IP 数</div>
+                <div class="stat-number blue" id="stat-ips">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">成功请求</div>
+                <div class="stat-number green" id="stat-success">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">异常 / 拦截</div>
+                <div class="stat-number red" id="stat-error">0</div>
+            </div>
+        </div>
+
+        <div class="analytics-grid">
+            <div class="analytics-card">
+                <div class="analytics-header"><span class="analytics-title">今日 TOP IP</span></div>
+                <div class="analytics-list" id="list-top-ip"></div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-header"><span class="analytics-title">今日 TOP TOKEN</span></div>
+                <div class="analytics-list" id="list-top-token"></div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-header"><span class="analytics-title">可疑 TOKEN (多IP)</span></div>
+                <div class="analytics-list" id="list-sus-token"></div>
+            </div>
+            <div class="analytics-card">
+                <div class="analytics-header"><span class="analytics-title">可疑 IP (多TOKEN)</span></div>
+                <div class="analytics-list" id="list-sus-ip"></div>
+            </div>
+        </div>
+
+        <div class="section-header">监控日志列表</div>
+
+        <div class="control-panel">
+            <div class="control-row">
+                <input type="text" id="search" class="search-input" placeholder="搜索 IP、地区、Token、备注或 UA..." oninput="filterTableData()">
+                <div class="btn-group">
+                    <button class="btn" onclick="fetchData()">刷新数据</button>
+                    <button class="btn" onclick="openBlacklistModal()" style="color:var(--primary-red); border-color:#fecaca; background:#fef2f2;">🚫 黑名单管理</button>
+                    <button class="btn" onclick="clearAllFilters()">重置所有</button>
                 </div>
-
-                <ul class="nav nav-pills mb-4" id="pills-tab" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="pills-domain-tab" data-bs-toggle="pill" data-bs-target="#pills-domain" type="button" role="tab">
-                            <i class="bi bi-globe me-1"></i> 域名与证书配置
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="pills-nodes-tab" data-bs-toggle="pill" data-bs-target="#pills-nodes" type="button" role="tab" onclick="loadNodes()">
-                            <i class="bi bi-hdd-network me-1"></i> 节点配置管理
-                        </button>
-                    </li>
-                </ul>
-
-                <div class="tab-content" id="pills-tabContent">
-                    <!-- 域名与证书配置页 -->
-                    <div class="tab-pane fade show active" id="pills-domain" role="tabpanel">
-                        <div class="mb-4">
-                            <h5><i class="bi bi-link-45deg me-2"></i>自定义代理域名</h5>
-                            <p class="text-muted small">设置自定义域名并自动申请 Let's Encrypt SSL 证书，请确保域名已解析到本服务器 IP。</p>
-                            
-                            <div class="input-group mb-3">
-                                <span class="input-group-text">https://</span>
-                                <input type="text" id="domain-input" class="form-control" placeholder="例如: vpn.yourdomain.com">
-                                <button class="btn btn-primary" type="button" onclick="submitDomainCert()">
-                                    <i class="bi bi-arrow-repeat me-1"></i> 更新域名并申请证书
-                                </button>
-                            </div>
-
-                            <div id="cert-status-box" class="status-box" style="display: none;"></div>
-                        </div>
-                    </div>
-
-                    <!-- 节点管理页 -->
-                    <div class="tab-pane fade" id="pills-nodes" role="tabpanel">
-                        <div class="d-flex justify-content-between align-items-center mb-3">
-                            <h5 class="m-0"><i class="bi bi-list-task me-2"></i>节点列表</h5>
-                            <button class="btn btn-sm btn-outline-primary" onclick="loadNodes()">
-                                <i class="bi bi-arrow-clockwise"></i> 刷新
-                            </button>
-                        </div>
-                        <div class="table-responsive">
-                            <table class="table table-hover align-middle">
-                                <thead class="table-light">
-                                    <tr>
-                                        <th>节点名称</th>
-                                        <th>地址 / 端口</th>
-                                        <th>协议类型</th>
-                                        <th>状态</th>
-                                    </tr>
-                                </thead>
-                                <tbody id="nodes-list">
-                                    <tr>
-                                        <td colspan="4" class="text-center text-muted">正在加载节点数据...</td>
-                                    </tr>
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
+            </div>
+            <div class="control-row">
+                <button class="time-trigger-btn" onclick="openTimeModal()">
+                    <span>时间范围:</span>
+                    <span id="time-display-label" class="tag">全部时间</span>
+                </button>
+                <div class="btn-group">
+                    <button class="btn btn-quick" onclick="setQuickMinutes(5)">近5分钟</button>
+                    <button class="btn btn-quick" onclick="setQuickMinutes(10)">近10分钟</button>
+                    <button class="btn btn-quick" onclick="setQuickMinutes(15)">近15分钟</button>
+                    <button class="btn btn-quick" onclick="setQuickMinutes(20)">近20分钟</button>
+                    <button class="btn btn-quick" onclick="setQuickMinutes(30)">近30分钟</button>
+                    <button class="btn btn-quick" onclick="setQuickTime(1)">近1小时</button>
+                    <button class="btn btn-quick" onclick="setTodayTime()">今天</button>
+                    <button class="btn btn-quick" onclick="setYesterdayTime()">昨天</button>
+                    <button class="btn btn-quick" onclick="setQuickDays(3)">近3天</button>
+                    <button class="btn btn-quick" onclick="setQuickDays(7)">近7天</button>
                 </div>
+            </div>
+            <!-- 域名修改与证书申请组件 -->
+            <div class="control-row">
+                <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
+                <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
+            </div>
+            <div id="cert-status-box" style="display:none; width:100%; font-size:0.78rem; padding:8px 12px; background:#f0f6ff; border:1px solid #bfdbfe; border-radius:8px; color:#1e40af; font-family:monospace; word-break:break-all;">
+                等待提交申请...
+            </div>
+        </div>
 
+        <div class="table-card">
+            <div class="table-wrapper">
+                <table id="desktop-table">
+                    <thead>
+                        <tr>
+                            <th>拉取时间</th>
+                            <th>IP</th>
+                            <th>Token</th>
+                            <th>状态</th>
+                            <th>备注</th>
+                            <th>客户端 (User-Agent)</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="log-table">
+                        <tr><td colspan="7" class="empty-state">加载数据中...</td></tr>
+                    </tbody>
+                </table>
             </div>
         </div>
     </div>
-</div>
 
-<!-- Toast 提示容器 -->
-<div class="toast-container" id="toast-container"></div>
-
-<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/js/bootstrap.bundle.min.js"></script>
-<script>
-    let certPollTimer = null;
-
-    // HTML 转义辅助函数
-    function escapeHtml(str) {
-        if (!str) return '';
-        return String(str)
-            .replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
-    }
-
-    // 显示 Toast 提示
-    function showToast(message, type = 'info') {
-        const container = document.getElementById('toast-container');
-        const toastEl = document.createElement('div');
-        toastEl.className = `toast align-items-center text-white bg-${type === 'error' ? 'danger' : type === 'success' ? 'success' : 'primary'} border-0 show`;
-        toastEl.setAttribute('role', 'alert');
-        toastEl.setAttribute('aria-live', 'assertive');
-        toastEl.setAttribute('aria-atomic', 'true');
-        
-        toastEl.innerHTML = `
-            <div class="d-flex">
-                <div class="toast-body">${escapeHtml(message)}</div>
-                <button type="button" class="btn-close btn-close-white me-2 m-auto" data-bs-dismiss="toast"></button>
+    <!-- Time Modal -->
+    <div id="time-modal" class="modal-overlay">
+        <div class="modal-card">
+            <div class="modal-header">选择自定义时间段 (精确到秒)</div>
+            <div class="modal-body">
+                <div class="input-group">
+                    <div class="input-label-row">
+                        <label class="input-label">开始时间</label>
+                        <button class="fill-helper-btn" onclick="fillZeroStart()">设为今日0时0分0秒</button>
+                    </div>
+                    <div class="picker-combo-row">
+                        <input type="date" id="m-start-date" class="date-picker-input">
+                        <select id="m-start-hour" class="time-select"></select>
+                        <select id="m-start-minute" class="time-select"></select>
+                        <select id="m-start-second" class="time-select"></select>
+                    </div>
+                </div>
+                <div class="input-group">
+                    <div class="input-label-row">
+                        <label class="input-label">结束时间</label>
+                        <button class="fill-helper-btn" onclick="fillNowEnd()">设为当前时间 (秒)</button>
+                    </div>
+                    <div class="picker-combo-row">
+                        <input type="date" id="m-end-date" class="date-picker-input">
+                        <select id="m-end-hour" class="time-select"></select>
+                        <select id="m-end-minute" class="time-select"></select>
+                        <select id="m-end-second" class="time-select"></select>
+                    </div>
+                </div>
             </div>
-        `;
-        
-        container.appendChild(toastEl);
-        setTimeout(() => {
-            toastEl.remove();
-        }, 3000);
-    }
+            <div class="modal-footer">
+                <button class="btn" onclick="closeTimeModal()">取消</button>
+                <button class="btn-primary" onclick="confirmTimeRange()">确定应用</button>
+            </div>
+        </div>
+    </div>
 
-    // 页面初始化：获取当前域名及证书申请状态
-    async function initDomainStatus() {
-        try {
-            const res = await fetch('/api/action.php?action=get_domain');
-            const data = await res.json();
-            
-            if (data) {
-                if (data.domain) {
-                    document.getElementById('domain-input').value = data.domain;
-                }
-                if (data.cert_status) {
-                    renderCertStatus(data.cert_status);
-                }
-                // 更新顶部服务状态
-                const systemStatus = document.getElementById('system-status');
-                systemStatus.className = 'badge bg-success status-badge';
-                systemStatus.innerHTML = '<i class="bi bi-check-circle-fill me-1"></i> 服务运行正常';
+    <!-- Blacklist Modal (黑名单管理弹窗) -->
+    <div id="blacklist-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 580px;">
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>🚫 黑名单规则管理</span>
+                <button class="fill-helper-btn" onclick="fetchBlacklistRules()" style="font-size:0.8rem;">🔄 刷新列表</button>
+            </div>
+            <div class="modal-body" style="gap:14px;">
+                <!-- 手动添加封禁输入框 -->
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:0.78rem; font-weight:600; color:var(--text-muted); margin-bottom:8px;">主动追加封禁规则</div>
+                    <div style="display:flex; gap:6px;">
+                        <select id="bl-input-type" class="time-select" style="flex:0 0 90px;">
+                            <option value="ip">IP 地址</option>
+                            <option value="token">Token</option>
+                            <option value="ua">User-Agent</option>
+                        </select>
+                        <input type="text" id="bl-input-value" class="search-input" style="flex:1;" placeholder="输入要封禁的目标 (例: 1.2.3.4 或 token_hash)">
+                        <button class="btn-primary" style="padding:6px 14px; font-size:0.8rem; flex-shrink:0;" onclick="submitManualBan()">添加封禁</button>
+                    </div>
+                </div>
+
+                <!-- 分类切换标签 -->
+                <div style="display:flex; gap:6px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                    <button id="bl-tab-ip" class="btn btn-quick active" onclick="switchBlTab('ip')">IP 黑名单 (<span id="bl-count-ip">0</span>)</button>
+                    <button id="bl-tab-token" class="btn btn-quick" onclick="switchBlTab('token')">Token 黑名单 (<span id="bl-count-token">0</span>)</button>
+                    <button id="bl-tab-ua" class="btn btn-quick" onclick="switchBlTab('ua')">UA 黑名单 (<span id="bl-count-ua">0</span>)</button>
+                </div>
+
+                <!-- 规则列表区域 -->
+                <div style="max-height: 280px; overflow-y: auto; display:flex; flex-direction:column; gap:6px; padding-right:2px;" id="bl-list-container">
+                    <div style="text-align:center; padding:24px; color:var(--text-muted); font-size:0.8rem;">加载黑名单中...</div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn" onclick="closeBlacklistModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
+    <div id="toast" class="toast">已复制到剪贴板</div>
+
+    <script>
+        let allLogs = [];
+        let lockedStartTime = ''; 
+        let lockedEndTime = '';   
+        let currentBlData = { ip: [], token: [], ua: [] };
+        let activeBlTab = 'ip';
+
+        function padZero(n) { return n.toString().padStart(2, '0'); }
+
+        async function submitDomainCert() {
+            const domainInput = document.getElementById('domain-input');
+            const statusBox = document.getElementById('cert-status-box');
+            const domain = domainInput.value.trim();
+
+            if (!domain) {
+                showToast('请输入有效的域名');
+                return;
             }
-        } catch (e) {
-            const systemStatus = document.getElementById('system-status');
-            systemStatus.className = 'badge bg-danger status-badge';
-            systemStatus.innerHTML = '<i class="bi bi-exclamation-triangle-fill me-1"></i> 服务连接异常';
-        }
-    }
 
-    // 渲染证书状态组件
-    function renderCertStatus(certStatus) {
-        const statusBox = document.getElementById('cert-status-box');
-        statusBox.style.display = 'block';
+            statusBox.style.display = 'block';
+            statusBox.innerHTML = '⏱️ 正在提交域名配置，并向 ACME/Let\'s Encrypt 申请 SSL 证书，请稍候...';
 
-        if (certStatus.status === 'processing') {
-            statusBox.className = 'status-box text-warning';
-            statusBox.innerHTML = `⏱️ ${escapeHtml(certStatus.msg || '正在申请证书中...')}`;
-        } else if (certStatus.status === 'success') {
-            statusBox.className = 'status-box text-success';
-            statusBox.innerHTML = `✅ ${escapeHtml(certStatus.msg || '证书申请并安装成功！')}`;
-        } else if (certStatus.status === 'error') {
-            statusBox.className = 'status-box text-danger';
-            statusBox.innerHTML = `❌ ${escapeHtml(certStatus.msg || '证书申请失败，请检查配置或域名解析')}`;
-        } else {
-            statusBox.style.display = 'none';
-        }
-    }
-
-    // 提交域名并申请证书（含轮询机制）
-    async function submitDomainCert() {
-        const domainInput = document.getElementById('domain-input');
-        const statusBox = document.getElementById('cert-status-box');
-        const domain = domainInput.value.trim();
-
-        if (!domain) {
-            showToast('请输入有效的域名', 'error');
-            return;
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'apply_cert', domain: domain })
+                });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    statusBox.innerHTML = `✅ 证书申请成功！域名已被修改为: <strong>${escapeHtml(domain)}</strong>`;
+                } else {
+                    statusBox.innerHTML = `❌ 申请失败: ${escapeHtml(data.message || '请检查域名解析与服务配置')}`;
+                }
+            } catch (err) {
+                statusBox.innerHTML = '❌ 请求出错，请检查接口与网络通信';
+            }
         }
 
-        // 清除上一次的轮询定时器
-        if (certPollTimer) clearInterval(certPollTimer);
+        function initTimeSelectOptions() {
+            const hourOptions = Array.from({length: 24}, (_, i) => `<option value="${padZero(i)}">${i}时</option>`).join('');
+            const minOptions = Array.from({length: 60}, (_, i) => `<option value="${padZero(i)}">${i}分</option>`).join('');
+            const secOptions = Array.from({length: 60}, (_, i) => `<option value="${padZero(i)}">${i}秒</option>`).join('');
 
-        statusBox.style.display = 'block';
-        statusBox.className = 'status-box text-primary';
-        statusBox.innerHTML = '⏱️ 正在提交域名配置并准备申请...';
+            document.getElementById('m-start-hour').innerHTML = hourOptions;
+            document.getElementById('m-end-hour').innerHTML = hourOptions;
+            document.getElementById('m-start-minute').innerHTML = minOptions;
+            document.getElementById('m-end-minute').innerHTML = minOptions;
+            document.getElementById('m-start-second').innerHTML = secOptions;
+            document.getElementById('m-end-second').innerHTML = secOptions;
+        }
 
-        try {
-            // 1. 提交配置请求
-            const res = await fetch('/api/action.php', {
+        function escapeHtml(str) {
+            if (!str) return '';
+            return String(str)
+                .replace(/&/g, '&amp;')
+                .replace(/</g, '&lt;')
+                .replace(/>/g, '&gt;')
+                .replace(/"/g, '&quot;')
+                .replace(/'/g, '&#39;');
+        }
+
+        function dateToYMD(date) {
+            return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())}`;
+        }
+
+        function setModalPickerValues(prefix, dateObj) {
+            document.getElementById(`m-${prefix}-date`).value = dateToYMD(dateObj);
+            document.getElementById(`m-${prefix}-hour`).value = padZero(dateObj.getHours());
+            document.getElementById(`m-${prefix}-minute`).value = padZero(dateObj.getMinutes());
+            document.getElementById(`m-${prefix}-second`).value = padZero(dateObj.getSeconds());
+        }
+
+        function getModalPickerValues(prefix) {
+            const date = document.getElementById(`m-${prefix}-date`).value;
+            if (!date) return '';
+            const hour = document.getElementById(`m-${prefix}-hour`).value || '00';
+            const minute = document.getElementById(`m-${prefix}-minute`).value || '00';
+            const second = document.getElementById(`m-${prefix}-second`).value || '00';
+            return `${date} ${hour}:${minute}:${second}`;
+        }
+
+        function fillZeroStart() {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            setModalPickerValues('start', startOfToday);
+        }
+
+        function fillNowEnd() {
+            setModalPickerValues('end', new Date());
+        }
+
+        function openTimeModal() {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+
+            if (lockedStartTime) {
+                const parts = lockedStartTime.split(' ');
+                document.getElementById('m-start-date').value = parts[0];
+                if (parts[1]) {
+                    const tParts = parts[1].split(':');
+                    document.getElementById('m-start-hour').value = tParts[0] || '00';
+                    document.getElementById('m-start-minute').value = tParts[1] || '00';
+                    document.getElementById('m-start-second').value = tParts[2] || '00';
+                }
+            } else {
+                setModalPickerValues('start', startOfToday);
+            }
+
+            if (lockedEndTime) {
+                const parts = lockedEndTime.split(' ');
+                document.getElementById('m-end-date').value = parts[0];
+                if (parts[1]) {
+                    const tParts = parts[1].split(':');
+                    document.getElementById('m-end-hour').value = tParts[0] || '00';
+                    document.getElementById('m-end-minute').value = tParts[1] || '00';
+                    document.getElementById('m-end-second').value = tParts[2] || '00';
+                }
+            } else {
+                setModalPickerValues('end', now);
+            }
+
+            document.getElementById('time-modal').classList.add('active');
+        }
+
+        function closeTimeModal() {
+            document.getElementById('time-modal').classList.remove('active');
+        }
+
+        function confirmTimeRange() {
+            lockedStartTime = getModalPickerValues('start');
+            lockedEndTime = getModalPickerValues('end');
+            updateLabelAndFilter();
+            closeTimeModal();
+        }
+
+        function clearAllFilters() {
+            lockedStartTime = '';
+            lockedEndTime = '';
+            document.getElementById('search').value = '';
+            updateLabelAndFilter();
+        }
+
+        function setQuickMinutes(minutes) {
+            const now = new Date();
+            const past = new Date(now.getTime() - minutes * 60 * 1000);
+            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
+            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            updateLabelAndFilter();
+        }
+
+        function setQuickTime(hours) {
+            const now = new Date();
+            const past = new Date(now.getTime() - hours * 60 * 60 * 1000);
+            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
+            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            updateLabelAndFilter();
+        }
+
+        function setTodayTime() {
+            const now = new Date();
+            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            lockedStartTime = `${dateToYMD(startOfToday)} 00:00:00`;
+            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            updateLabelAndFilter();
+        }
+
+        function setYesterdayTime() {
+            const now = new Date();
+            const startOfYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
+            const endOfYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
+            lockedStartTime = `${dateToYMD(startOfYest)} 00:00:00`;
+            lockedEndTime = `${dateToYMD(endOfYest)} 23:59:59`;
+            updateLabelAndFilter();
+        }
+
+        function setQuickDays(days) {
+            const now = new Date();
+            const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
+            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
+            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            updateLabelAndFilter();
+        }
+
+        function updateLabelAndFilter() {
+            const label = document.getElementById('time-display-label');
+            if (!lockedStartTime && !lockedEndTime) {
+                label.innerText = '全部时间';
+            } else {
+                const startStr = lockedStartTime || '最早';
+                const endStr = lockedEndTime || '最晚';
+                label.innerText = `${startStr} 至 ${endStr}`;
+            }
+            filterTableData();
+        }
+
+        function showToast(text) {
+            const toast = document.getElementById('toast');
+            toast.innerText = text;
+            toast.classList.add('show');
+            setTimeout(() => toast.classList.remove('show'), 2000);
+        }
+
+        function copyToClipboard(text, label) {
+            if (!text || text === '-') return;
+            if (navigator.clipboard && window.isSecureContext) {
+                navigator.clipboard.writeText(text).then(() => {
+                    showToast('已复制 ' + label + ': ' + text);
+                }).catch(() => fallbackCopy(text, label));
+            } else {
+                fallbackCopy(text, label);
+            }
+        }
+
+        function fallbackCopy(text, label) {
+            const textArea = document.createElement("textarea");
+            textArea.value = text;
+            textArea.style.position = "fixed";
+            textArea.style.left = "-999999px";
+            textArea.style.top = "-999999px";
+            document.body.appendChild(textArea);
+            textArea.focus();
+            textArea.select();
+            try {
+                document.execCommand('copy');
+                showToast('已复制 ' + label + ': ' + text);
+            } catch (err) {
+                showToast('复制失败');
+            }
+            document.body.removeChild(textArea);
+        }
+
+        function banTarget(type, value) {
+            if (!value || value === '-') return;
+            const typeLabel = type === 'ip' ? 'IP' : (type === 'token' ? 'Token' : 'UA');
+            if (!confirm(`确定要封禁该 ${typeLabel} 吗？\n${value}`)) return;
+
+            fetch('/api/action.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'apply_cert', domain: domain })
+                body: JSON.stringify({ action: 'ban', type: type, value: value })
+            })
+            .then(res => res.json())
+            .then(data => {
+                if (data.status === 'success') {
+                    showToast(`已成功封禁 ${typeLabel}: ${value}`);
+                    fetchData();
+                    if (document.getElementById('blacklist-modal').classList.contains('active')) {
+                        fetchBlacklistRules();
+                    }
+                } else {
+                    showToast(data.message || '封禁失败');
+                }
+            })
+            .catch(() => showToast('封禁请求失败，请检查接口'));
+        }
+
+        // --- 黑名单弹窗功能扩展 ---
+        function openBlacklistModal() {
+            document.getElementById('blacklist-modal').classList.add('active');
+            fetchBlacklistRules();
+        }
+
+        function closeBlacklistModal() {
+            document.getElementById('blacklist-modal').classList.remove('active');
+        }
+
+        async function fetchBlacklistRules() {
+            try {
+                const res = await fetch('/api/action.php?action=list');
+                const ret = await res.json();
+                if (ret.status === 'success') {
+                    currentBlData = ret.data || { ip: [], token: [], ua: [] };
+                    document.getElementById('bl-count-ip').innerText = (currentBlData.ip || []).length;
+                    document.getElementById('bl-count-token').innerText = (currentBlData.token || []).length;
+                    document.getElementById('bl-count-ua').innerText = (currentBlData.ua || []).length;
+                    renderBlacklistTab();
+                }
+            } catch (e) {
+                showToast('获取黑名单列表失败', false);
+            }
+        }
+
+        function switchBlTab(type) {
+            activeBlTab = type;
+            ['ip', 'token', 'ua'].forEach(t => {
+                const btn = document.getElementById(`bl-tab-${t}`);
+                if (t === type) btn.classList.add('active');
+                else btn.classList.remove('active');
             });
-            const data = await res.json();
-
-            if (data.status === 'success') {
-                showToast('配置提交成功，开始申请证书', 'success');
-                statusBox.className = 'status-box text-warning';
-                statusBox.innerHTML = `⏱️ 域名已更新为 <strong>${escapeHtml(domain)}</strong>，正在向 Let's Encrypt 申请 SSL 证书，请稍候...`;
-
-                // 2. 开启轮询追踪后台脚本申请进度
-                let checkCount = 0;
-                certPollTimer = setInterval(async () => {
-                    checkCount++;
-                    // 60秒超时保护
-                    if (checkCount > 30) {
-                        clearInterval(certPollTimer);
-                        statusBox.className = 'status-box text-danger';
-                        statusBox.innerHTML = '⚠️ 申请超时，请刷新页面检查后台状态';
-                        return;
-                    }
-
-                    try {
-                        const statusRes = await fetch('/api/action.php?action=get_domain');
-                        const statusData = await statusRes.json();
-
-                        if (statusData && statusData.cert_status) {
-                            const certStatus = statusData.cert_status;
-
-                            if (certStatus.status === 'processing') {
-                                statusBox.className = 'status-box text-warning';
-                                statusBox.innerHTML = `⏱️ ${escapeHtml(certStatus.msg || '正在申请证书中...')}`;
-                            } else if (certStatus.status === 'success') {
-                                clearInterval(certPollTimer);
-                                statusBox.className = 'status-box text-success';
-                                statusBox.innerHTML = `✅ ${escapeHtml(certStatus.msg || '证书申请并安装成功！')}`;
-                                showToast('SSL证书申请成功并已生效！', 'success');
-                            } else if (certStatus.status === 'error') {
-                                clearInterval(certPollTimer);
-                                statusBox.className = 'status-box text-danger';
-                                statusBox.innerHTML = `❌ ${escapeHtml(certStatus.msg || '证书申请失败，请检查解析')}`;
-                                showToast('证书申请失败', 'error');
-                            }
-                        }
-                    } catch (e) {
-                        // 忽略轮询网络抖动
-                    }
-                }, 2000);
-
-            } else {
-                statusBox.className = 'status-box text-danger';
-                statusBox.innerHTML = `❌ 提交失败: ${escapeHtml(data.message || '系统错误')}`;
-                showToast(data.message || '提交失败', 'error');
-            }
-        } catch (err) {
-            statusBox.className = 'status-box text-danger';
-            statusBox.innerHTML = '❌ 请求出错，请检查网络或 API 接口通信';
-            showToast('请求接口失败', 'error');
+            renderBlacklistTab();
         }
-    }
 
-    // 加载节点列表
-    async function loadNodes() {
-        const listBody = document.getElementById('nodes-list');
-        listBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">正在加载节点数据...</td></tr>';
-
-        try {
-            const res = await fetch('/api/action.php?action=get_nodes');
-            const data = await res.json();
-
-            if (Array.isArray(data) && data.length > 0) {
-                listBody.innerHTML = data.map(node => `
-                    <tr>
-                        <td><strong>${escapeHtml(node.name || '未命名节点')}</strong></td>
-                        <td>${escapeHtml(node.server || '-')}:${escapeHtml(node.port || '-')}</td>
-                        <td><span class="badge bg-info text-dark">${escapeHtml(node.type || 'vless')}</span></td>
-                        <td><span class="badge bg-success">在线</span></td>
-                    </tr>
-                `).join('');
-            } else {
-                listBody.innerHTML = '<tr><td colspan="4" class="text-center text-muted">暂无节点信息</td></tr>';
+        function renderBlacklistTab() {
+            const container = document.getElementById('bl-list-container');
+            const list = currentBlData[activeBlTab] || [];
+            if (list.length === 0) {
+                container.innerHTML = `<div style="text-align:center; padding:24px; color:var(--text-muted); font-size:0.8rem;">暂无 ${activeBlTab.toUpperCase()} 封禁规则</div>`;
+                return;
             }
-        } catch (e) {
-            listBody.innerHTML = '<tr><td colspan="4" class="text-center text-danger">加载节点失败</td></tr>';
-        }
-    }
 
-    // 页面加载完成执行
-    document.addEventListener('DOMContentLoaded', () => {
-        initDomainStatus();
-    });
-</script>
+            container.innerHTML = list.map(item => `
+                <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid var(--border); padding:8px 12px; border-radius:8px; font-size:0.8rem;">
+                    <span style="font-family:monospace; word-break:break-all; max-width:80%; font-weight:600; color:var(--text-primary);">${escapeHtml(item)}</span>
+                    <button class="btn-unban" onclick="unbanTarget('${activeBlTab}', '${escapeHtml(item)}')">解封</button>
+                </div>
+            `).join('');
+        }
+
+        async function submitManualBan() {
+            const type = document.getElementById('bl-input-type').value;
+            const value = document.getElementById('bl-input-value').value.trim();
+            if (!value) {
+                showToast('输入内容不能为空');
+                return;
+            }
+
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'ban', type, value })
+                });
+                const data = await res.json();
+                showToast(data.message || '操作成功');
+                if (data.status === 'success') {
+                    document.getElementById('bl-input-value').value = '';
+                    fetchBlacklistRules();
+                    fetchData();
+                }
+            } catch (e) {
+                showToast('网络请求失败');
+            }
+        }
+
+        async function unbanTarget(type, value) {
+            if (!confirm(`确定要解封该 ${type.toUpperCase()} 吗？\n${value}`)) return;
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'unban', type, value })
+                });
+                const data = await res.json();
+                showToast(data.message || '操作成功');
+                if (data.status === 'success') {
+                    fetchBlacklistRules();
+                    fetchData();
+                }
+            } catch (e) {
+                showToast('网络请求失败');
+            }
+        }
+
+        function renderCopyBtn(text, label) {
+            if (!text || text === '-') return '';
+            const safeText = escapeHtml(text);
+            const copyIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+            return `<button class="btn-copy-icon" data-copy="${safeText}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), '${label}')" title="复制 ${label}">${copyIconSvg}</button>`;
+        }
+
+        function toggleExpand(el) { el.classList.toggle('expanded'); }
+
+        function getStatusBadge(code) {
+            switch(code) {
+                case '200': return `<span class="badge badge-200">${code}</span>`;
+                case '400': return `<span class="badge badge-400">${code}</span>`;
+                case '401': return `<span class="badge badge-401">${code}</span>`;
+                case '403': return `<span class="badge badge-403">${code}</span>`;
+                case '404': return `<span class="badge badge-404">${code}</span>`;
+                case '429': return `<span class="badge badge-429">${code}</span>`;
+                case '500':
+                case '502':
+                case '503': return `<span class="badge badge-500">${code}</span>`;
+                default: return `<span class="badge badge-other">${code}</span>`;
+            }
+        }
+
+        function getRemarkText(code) {
+            switch(code) {
+                case '200': return '成功拉取订阅';
+                case '400': return '伪造请求';
+                case '403': return 'Token过期';
+                case '404': return '订阅路径错误';
+                case '429': return '请求过多';
+                case '500':
+                case '502': return '服务异常';
+                default: return '';
+            }
+        }
+
+        function getRemark(code) {
+            switch(code) {
+                case '200': return '<span class="remark-text" style="color:#16a34a;">成功拉取订阅</span>';
+                case '400': return '<span class="remark-text" style="color:#b45309;">伪造请求</span>';
+                case '403': return '<span class="remark-text" style="color:#dc2626;">Token过期</span>';
+                case '404': return '<span class="remark-text" style="color:#6b21a8;">订阅路径错误</span>';
+                case '429': return '<span class="remark-text" style="color:#ea580c;">请求过多</span>';
+                case '500':
+                case '502': return '<span class="remark-text" style="color:#9f1239;">服务异常</span>';
+                default: return `<span class="remark-text" style="color:var(--text-muted);">-</span>`;
+            }
+        }
+
+        function renderPillBox(rawText, label) {
+            if (!rawText || rawText === '-') {
+                return '<span style="color:var(--text-muted)">-</span>';
+            }
+            const safeText = escapeHtml(rawText);
+            const copyIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
+            return `<div class="pill-box" onclick="toggleExpand(this)" title="点击展开/折叠">
+                <span>${safeText}</span>
+                <button class="btn-copy-icon" data-copy="${safeText}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), '${label}')" title="复制 ${label}">${copyIconSvg}</button>
+            </div>`;
+        }
+
+        async function fetchData() {
+            try {
+                const res = await fetch('/api/logs.php');
+                allLogs = await res.json();
+                
+                const now = new Date();
+                document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
+                
+                renderStats(allLogs);
+                renderAnalyticsCards(allLogs);
+                filterTableData();
+            } catch (err) {
+                document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+            }
+        }
+
+        function isWithinTimeRange(logTimeStr) {
+            if (!lockedStartTime && !lockedEndTime) return true;
+
+            let logFormatted = logTimeStr;
+            if (logFormatted.length === 16) {
+                logFormatted += ":00";
+            }
+
+            if (lockedStartTime) {
+                let startFormatted = lockedStartTime;
+                if (startFormatted.length === 16) startFormatted += ":00";
+                if (logFormatted < startFormatted) return false;
+            }
+            if (lockedEndTime) {
+                let endFormatted = lockedEndTime;
+                if (endFormatted.length === 16) endFormatted += ":59";
+                if (logFormatted > endFormatted) return false;
+            }
+
+            return true;
+        }
+
+        function filterTableData() {
+            const query = document.getElementById('search').value.toLowerCase();
+
+            const filtered = allLogs.filter(l => {
+                const remarkText = getRemarkText(l.status).toLowerCase();
+                const matchSearch = (l.ip && l.ip.toLowerCase().includes(query)) ||
+                    (l.ip_info && l.ip_info.toLowerCase().includes(query)) ||
+                    (l.token && l.token.toLowerCase().includes(query)) ||
+                    (l.ua && l.ua.toLowerCase().includes(query)) ||
+                    l.status.includes(query) ||
+                    remarkText.includes(query);
+
+                const matchTime = isWithinTimeRange(l.time);
+
+                return matchSearch && matchTime;
+            });
+
+            renderTable(filtered);
+        }
+
+        function renderStats(logs) {
+            document.getElementById('stat-total').innerText = logs.length;
+            const ips = new Set(logs.map(l => l.ip));
+            document.getElementById('stat-ips').innerText = ips.size;
+            const success = logs.filter(l => l.status === '200').length;
+            document.getElementById('stat-success').innerText = success;
+            document.getElementById('stat-error').innerText = logs.length - success;
+        }
+
+        function renderAnalyticsCards(logs) {
+            const todayStr = dateToYMD(new Date());
+            const todayLogs = logs.filter(l => l.time && l.time.startsWith(todayStr));
+
+            const ipStats = {};
+            todayLogs.forEach(l => {
+                if (!l.ip) return;
+                if (!ipStats[l.ip]) ipStats[l.ip] = { count: 0, info: l.ip_info };
+                ipStats[l.ip].count++;
+            });
+            const topIpList = Object.keys(ipStats)
+                .map(ip => ({ ip, ...ipStats[ip] }))
+                .sort((a, b) => b.count - a.count);
+
+            renderCardList('list-top-ip', topIpList, item => `
+                <div class="item-left">
+                    <span class="rank-num">${item.rank}</span>
+                    <div class="item-main">
+                        <div class="item-title-row">
+                            <span class="item-title">${escapeHtml(item.ip)}</span>
+                            ${renderCopyBtn(item.ip, 'IP')}
+                        </div>
+                        <span class="item-sub">${escapeHtml(item.info || '')}</span>
+                    </div>
+                </div>
+                <div class="item-right">
+                    <span class="count-badge">${item.count}次</span>
+                    <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
+                </div>
+            `);
+
+            const tokenStats = {};
+            todayLogs.forEach(l => {
+                if (!l.token || l.token === '-') return;
+                if (!tokenStats[l.token]) tokenStats[l.token] = { count: 0, lastTime: l.time };
+                tokenStats[l.token].count++;
+                if (l.time > tokenStats[l.token].lastTime) tokenStats[l.token].lastTime = l.time;
+            });
+            const topTokenList = Object.keys(tokenStats)
+                .map(t => ({ token: t, ...tokenStats[t] }))
+                .sort((a, b) => b.count - a.count);
+
+            renderCardList('list-top-token', topTokenList, item => {
+                const timeOnly = item.lastTime ? item.lastTime.split(' ')[1] : '';
+                return `
+                    <div class="item-left">
+                        <span class="rank-num">${item.rank}</span>
+                        <div class="item-main">
+                            <div class="item-title-row">
+                                <span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>
+                                ${renderCopyBtn(item.token, 'Token')}
+                            </div>
+                            <span class="item-sub">${timeOnly}</span>
+                        </div>
+                    </div>
+                    <div class="item-right">
+                        <span class="count-badge">${item.count}次</span>
+                        <button class="btn-ban" onclick="banTarget('token', '${escapeHtml(item.token)}')">🚫 封禁</button>
+                    </div>
+                `;
+            });
+
+            const tokenIpMap = {};
+            logs.forEach(l => {
+                if (!l.token || l.token === '-' || !l.ip) return;
+                if (!tokenIpMap[l.token]) tokenIpMap[l.token] = new Set();
+                tokenIpMap[l.token].add(l.ip);
+            });
+            const susTokenList = Object.keys(tokenIpMap)
+                .filter(t => tokenIpMap[t].size > 1)
+                .map(t => ({ token: t, ipCount: tokenIpMap[t].size }))
+                .sort((a, b) => b.ipCount - a.ipCount);
+
+            renderCardList('list-sus-token', susTokenList, item => `
+                <div class="item-left">
+                    <span class="rank-num">${item.rank}</span>
+                    <div class="item-main">
+                        <div class="item-title-row">
+                            <span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>
+                            ${renderCopyBtn(item.token, 'Token')}
+                        </div>
+                    </div>
+                </div>
+                <div class="item-right">
+                    <span class="count-badge" style="color:var(--primary-red)">${item.ipCount} 个IP</span>
+                    <button class="btn-ban" onclick="banTarget('token', '${escapeHtml(item.token)}')">🚫 封禁</button>
+                </div>
+            `);
+
+            const ipTokenMap = {};
+            logs.forEach(l => {
+                if (!l.ip || !l.token || l.token === '-') return;
+                if (!ipTokenMap[l.ip]) ipTokenMap[l.ip] = { tokens: new Set(), info: l.ip_info };
+                ipTokenMap[l.ip].tokens.add(l.token);
+            });
+            const susIpList = Object.keys(ipTokenMap)
+                .filter(ip => ipTokenMap[ip].tokens.size > 1)
+                .map(ip => ({ ip, tokenCount: ipTokenMap[ip].tokens.size, info: ipTokenMap[ip].info }))
+                .sort((a, b) => b.tokenCount - a.tokenCount);
+
+            renderCardList('list-sus-ip', susIpList, item => `
+                <div class="item-left">
+                    <span class="rank-num">${item.rank}</span>
+                    <div class="item-main">
+                        <div class="item-title-row">
+                            <span class="item-title">${escapeHtml(item.ip)}</span>
+                            ${renderCopyBtn(item.ip, 'IP')}
+                        </div>
+                        <span class="item-sub">${escapeHtml(item.info || '')}</span>
+                    </div>
+                </div>
+                <div class="item-right">
+                    <span class="count-badge" style="color:var(--primary-red)">${item.tokenCount} 个Token</span>
+                    <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
+                </div>
+            `);
+        }
+
+        function renderCardList(containerId, list, templateFn) {
+            const el = document.getElementById(containerId);
+            if (!el) return;
+            if (list.length === 0) {
+                el.innerHTML = '<div style="color:var(--text-muted); font-size:0.75rem; text-align:center; padding:24px 0;">暂无记录</div>';
+                return;
+            }
+            el.innerHTML = list.map((item, idx) => {
+                item.rank = idx + 1;
+                return `<div class="analytics-item">${templateFn(item)}</div>`;
+            }).join('');
+        }
+
+        function renderTable(logs) {
+            const tbody = document.getElementById('log-table');
+            if (logs.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未查询到符合条件的日志记录</td></tr>';
+                return;
+            }
+
+            const isMobile = window.innerWidth <= 768;
+
+            if (isMobile) {
+                tbody.innerHTML = logs.map(l => {
+                    const hasUa = l.ua && l.ua !== '-';
+                    const uaHtml = hasUa
+                        ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${escapeHtml(l.ua)}</div>`
+                        : '';
+
+                    const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
+                    const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
+
+                    return `
+                        <tr class="m-card">
+                            <td>
+                                <div class="m-card-header">
+                                    <div class="m-time">${escapeHtml(l.time)}</div>
+                                    <div class="m-status-group">
+                                        ${getStatusBadge(l.status)}
+                                        ${getRemark(l.status)}
+                                    </div>
+                                </div>
+                                <div class="m-card-body">
+                                    <div class="m-row">
+                                        <div class="m-label">IP</div>
+                                        <div class="m-value">
+                                            ${renderPillBox(l.ip, 'IP')}
+                                            <div class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || '')}</div>
+                                        </div>
+                                    </div>
+                                    <div class="m-row">
+                                        <div class="m-label">Token</div>
+                                        <div class="m-value">${renderPillBox(l.token, 'Token')}</div>
+                                    </div>
+                                    <div class="m-row">
+                                        <div class="m-label">操作</div>
+                                        <div class="m-value">
+                                            <div class="ban-actions">
+                                                ${banIpBtn}
+                                                ${banTokenBtn}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                ${uaHtml}
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            } else {
+                tbody.innerHTML = logs.map(l => {
+                    const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
+                    const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
+
+                    return `
+                        <tr>
+                            <td style="color:#334155">${escapeHtml(l.time)}</td>
+                            <td>
+                                ${renderPillBox(l.ip, 'IP')}
+                                <div class="ip-sub">${escapeHtml(l.ip_info || '')}</div>
+                            </td>
+                            <td>${renderPillBox(l.token, 'Token')}</td>
+                            <td>${getStatusBadge(l.status)}</td>
+                            <td>${getRemark(l.status)}</td>
+                            <td class="ua-text" title="${escapeHtml(l.ua)}">${escapeHtml(l.ua)}</td>
+                            <td>
+                                <div class="ban-actions">
+                                    ${banIpBtn}
+                                    ${banTokenBtn}
+                                </div>
+                            </td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        }
+
+        window.addEventListener('resize', () => {
+            if (allLogs.length > 0) filterTableData();
+        });
+
+        initTimeSelectOptions();
+        fetchData();
+        setInterval(fetchData, 5000);
+    </script>
 </body>
 </html>
