@@ -1,7 +1,7 @@
 <?php
 header('Content-Type: application/json; charset=utf-8');
 
-// 统一解析来自前端的 JSON Body 或普通 GET/POST 参数
+// 1. 统一解析来自前端的 JSON Body、GET 与 POST 参数
 $rawInput = file_get_contents('php://input');
 $inputData = json_decode($rawInput, true) ?: [];
 
@@ -11,8 +11,10 @@ $ipFile = '/etc/nginx/rules/ip_blacklist.conf';
 $uaFile = '/etc/nginx/rules/ua_blacklist.conf';
 $tokenFile = '/etc/nginx/rules/token_blacklist.conf';
 $reloadFlag = '/etc/nginx/rules/.reload_flag';
+$logFile = '/var/log/nginx/access.log';
 
-// 辅助函数：格式化 Nginx 规则
+// ------------------- 辅助函数 -------------------
+
 function formatRule($type, $value) {
     switch ($type) {
         case 'ip':
@@ -27,7 +29,6 @@ function formatRule($type, $value) {
     }
 }
 
-// 辅助函数：从配置文件中还原出原始封禁目标值
 function parseRuleValue($type, $line) {
     $line = trim($line);
     if (empty($line) || str_starts_with($line, '#')) return null;
@@ -44,7 +45,58 @@ function parseRuleValue($type, $line) {
     return null;
 }
 
-// 1. 获取规则列表
+// ------------------- 路由处理 -------------------
+
+// 1. 获取日志列表 (只读最后 300 行，极速解析)
+if ($action === 'logs' || $action === 'get_logs') {
+    $logs = [];
+    if (file_exists($logFile)) {
+        // 使用 tail 读取末尾 300 行
+        $cmd = "tail -n 300 " . escapeshellarg($logFile);
+        exec($cmd, $lines);
+        $lines = array_reverse($lines);
+
+        // 正则匹配标准 Nginx 格式: IP - - [TIME] "METHOD URL PROTOCOL" STATUS BYTES "REFERER" "UA"
+        $pattern = '/^(\S+) \S+ \S+ \[([^\]]+)\] "(\S+)\s+([^\s"]*)[^"]*" (\d+) \d+ "([^"]*)" "([^"]*)"/';
+
+        foreach ($lines as $line) {
+            if (preg_match($pattern, $line, $m)) {
+                $rawIp = $m[1];
+                $time = $m[2];
+                $method = $m[3];
+                $url = $m[4];
+                $status = $m[5];
+                $referer = $m[6] === '-' ? '' : $m[6];
+                $ua = $m[7] === '-' ? '' : $m[7];
+
+                // 从 URL 解析 token 参数
+                $token = '';
+                $parsedUrl = parse_url($url);
+                if (isset($parsedUrl['query'])) {
+                    parse_str($parsedUrl['query'], $queryParams);
+                    $token = $queryParams['token'] ?? '';
+                }
+
+                $logs[] = [
+                    'ip' => $rawIp,
+                    'time' => $time,
+                    'method' => $method,
+                    'path' => $parsedUrl['path'] ?? $url,
+                    'url' => $url,
+                    'status' => (int)$status,
+                    'token' => $token,
+                    'ua' => $ua,
+                    'referer' => $referer
+                ];
+            }
+        }
+    }
+
+    echo json_encode(['status' => 'success', 'data' => $logs]);
+    exit;
+}
+
+// 2. 获取黑名单列表
 if ($action === 'list') {
     $getRules = function($filePath, $type) {
         if (!file_exists($filePath)) return [];
@@ -68,10 +120,10 @@ if ($action === 'list') {
     exit;
 }
 
-// 2. 添加封禁
+// 3. 执行封禁
 if ($action === 'ban') {
-    $type = $inputData['type'] ?? '';
-    $value = trim($inputData['value'] ?? '');
+    $type = $inputData['type'] ?? ($_POST['type'] ?? '');
+    $value = trim($inputData['value'] ?? ($_POST['value'] ?? ''));
 
     if (!in_array($type, ['ip', 'ua', 'token']) || empty($value)) {
         echo json_encode(['status' => 'error', 'message' => '参数不合法']);
@@ -85,26 +137,21 @@ if ($action === 'ban') {
     };
 
     $ruleLine = formatRule($type, $value);
-    
-    // 检查是否已存在
     $existing = file_exists($targetFile) ? file_get_contents($targetFile) : '';
-    if (str_contains($existing, $ruleLine)) {
-        echo json_encode(['status' => 'success', 'message' => '该规则已存在']);
-        exit;
-    }
 
-    // 追加规则并触发 reload 标记
-    file_put_contents($targetFile, $ruleLine . "\n", FILE_APPEND);
-    touch($reloadFlag);
+    if (!str_contains($existing, $ruleLine)) {
+        file_put_contents($targetFile, $ruleLine . "\n", FILE_APPEND);
+        touch($reloadFlag);
+    }
 
     echo json_encode(['status' => 'success', 'message' => "已成功封禁 {$type}: {$value}"]);
     exit;
 }
 
-// 3. 解除封禁
+// 4. 执行解封
 if ($action === 'unban') {
-    $type = $inputData['type'] ?? '';
-    $value = trim($inputData['value'] ?? '');
+    $type = $inputData['type'] ?? ($_POST['type'] ?? '');
+    $value = trim($inputData['value'] ?? ($_POST['value'] ?? ''));
 
     $targetFile = match($type) {
         'ip' => $ipFile,
@@ -123,7 +170,7 @@ if ($action === 'unban') {
     foreach ($lines as $line) {
         $val = parseRuleValue($type, $line);
         if ($val !== null && $val === $value) {
-            continue; // 跳过要删除的规则
+            continue;
         }
         $newLines[] = $line;
     }
@@ -135,7 +182,7 @@ if ($action === 'unban') {
     exit;
 }
 
-// 4. 获取域名配置（兼容现有接口）
+// 5. 获取域名与证书状态
 if ($action === 'get_domain') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     $domain = '';
@@ -145,38 +192,38 @@ if ($action === 'get_domain') {
             $domain = trim($matches[1]);
         }
     }
-    
+
     $status = ['status' => 'idle', 'msg' => ''];
     $statusFile = '/etc/nginx/rules/cert_status.json';
     if (file_exists($statusFile)) {
         $status = json_decode(file_get_contents($statusFile), true) ?: $status;
     }
-    
+
     echo json_encode(['domain' => $domain, 'cert_status' => $status]);
     exit;
 }
 
-// 5. 更新域名并申请证书（兼容 update_domain 和 apply_cert 两种动作名）
+// 6. 更新域名并触发证书申请
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
         echo json_encode(['status' => 'error', 'message' => '域名不能为空']);
         exit;
     }
-    
+
     $confPath = '/etc/nginx/conf.d/default.conf';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
         $newConf = preg_replace('/server_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
         file_put_contents($confPath, $newConf);
     }
-    
+
     file_put_contents('/etc/nginx/rules/.cert_flag', $newDomain);
     file_put_contents('/etc/nginx/rules/cert_status.json', json_encode([
         'status' => 'processing',
         'msg' => '已提交申请，后台正在联系 Let\'s Encrypt 签发证书...'
     ]));
-    
+
     echo json_encode(['status' => 'success', 'message' => '配置已更新，正在后台自动申请证书...']);
     exit;
 }
