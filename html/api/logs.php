@@ -2,18 +2,16 @@
 header('Content-Type: application/json; charset=utf-8');
 header('Access-Control-Allow-Origin: *');
 
-// 强制设置默认时区为 UTC+8
 date_default_timezone_set('Asia/Shanghai');
 
 $logFile = '/etc/nginx/rules/access.log';
-$cacheFile = '/tmp/ip_cache.json'; // IP 归属地持久化磁盘缓存文件
+$cacheFile = '/tmp/ip_cache.json';
 
 if (!file_exists($logFile)) {
     echo json_encode([]);
     exit;
 }
 
-// 1. 读取本地磁盘持久化 IP 缓存
 $ipCache = [];
 if (file_exists($cacheFile)) {
     $ipCache = json_decode(file_get_contents($cacheFile), true) ?: [];
@@ -58,14 +56,13 @@ function getIpLocation($ip, &$ipCache, &$cacheUpdated) {
     return "公网 IP";
 }
 
-// 2. 读取日志末尾 128KB
 $fp = fopen($logFile, 'r');
 if (!$fp) {
     echo json_encode([]);
     exit;
 }
 $size = filesize($logFile);
-$readSize = min($size, 131072);
+$readSize = min($size, 262144); // 读取更大的日志范围
 $lines = [];
 
 if ($readSize > 0) {
@@ -78,8 +75,6 @@ if ($readSize > 0) {
 }
 
 $lines = array_reverse($lines);
-$lines = array_slice($lines, 0, 200);
-
 $result = [];
 $targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
@@ -92,8 +87,17 @@ foreach ($lines as $line) {
         $referer  = $matches[5];
         $ua       = $matches[6];
 
+        // 过滤掉面板自身的 API 请求，避免日志被自己刷屏
+        if (strpos($url, '/api/') !== false) {
+            continue;
+        }
+
         $token = '-';
-        $queryString = parse_url($url, PHP_URL_QUERY);
+        $parsedUrl = parse_url($url);
+        $path = $parsedUrl['path'] ?? $url;
+        $queryString = $parsedUrl['query'] ?? '';
+
+        // 1. 尝试从 Query 参数中获取 token (?token=xxx)
         if ($queryString) {
             parse_str($queryString, $queryParams);
             if (!empty($queryParams['token'])) {
@@ -101,7 +105,18 @@ foreach ($lines as $line) {
             }
         }
 
-        // 解析日志原始时间，并显式转换为 UTC+8 格式
+        // 2. 如果 Query 中没有，尝试从路径中提取 (例如 /sub/token 或 /uuid)
+        if ($token === '-' && $path !== '/' && $path !== '') {
+            $segments = explode('/', trim($path, '/'));
+            foreach ($segments as $seg) {
+                // 假设 Token 或 UUID 长度通常大于等于 8 位，且不是常见静态目录
+                if (strlen($seg) >= 8 && !in_array($seg, ['sub', 'api', 'static', 'assets'])) {
+                    $token = $seg;
+                    break;
+                }
+            }
+        }
+
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         if ($dt) {
             $dt->setTimezone($targetTimeZone);
@@ -118,13 +133,16 @@ foreach ($lines as $line) {
             'status'  => $status,
             'ua'      => $ua
         ];
+
+        // 限制最多展示前 100 条有效业务日志
+        if (count($result) >= 100) {
+            break;
+        }
     }
 }
 
-// 4. 更新磁盘缓存
 if ($cacheUpdated) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-// 直接输出纯数组供前端解析
 echo json_encode($result, JSON_UNESCAPED_UNICODE);
