@@ -323,7 +323,7 @@ if ($action === 'get_domain') {
     exit;
 }
 
-// 7. 更新域名并触发证书申请
+// 7. 更新域名并触发证书申请（已升级：自动支持从 IP 模式平滑切换为正式域名 HTTPS 模式）
 if ($action === 'update_domain' || $action === 'apply_cert') {
     $newDomain = trim($inputData['domain'] ?? ($_POST['domain'] ?? ''));
     if (empty($newDomain)) {
@@ -334,7 +334,88 @@ if ($action === 'update_domain' || $action === 'apply_cert') {
     $confPath = '/etc/nginx/conf.d/default.conf';
     if (file_exists($confPath)) {
         $conf = file_get_contents($confPath);
-        $newConf = preg_replace('/\bserver_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
+        
+        // 如果当前是通配符 _，或者需要全新指定 server_name，使用更健壮的升级模板写入
+        // 检查配置中是否已经有标准的双 server 结构（80重定向 + 443SSL）
+        if (!str_contains($conf, 'listen 443 ssl;')) {
+            // 如果原本是纯 IP 模式，转换为标准的带 SSL 框架
+            // 提取原本的 proxy_pass 目标（若有）
+            $upstreamTarget = "https://example.com";
+            if (preg_match('/proxy_pass\s+([^;]+);/', $conf, $pm)) {
+                $upstreamTarget = trim($pm[1]);
+            }
+
+            $newConf = <<<EOF
+# ----------------------------------------------------
+# 自动升级后的 HTTPS 与反向代理配置
+# ----------------------------------------------------
+server {
+    listen 80;
+    server_name {$newDomain};
+
+    location /.well-known/acme-challenge/ {
+        root /var/www/html;
+    }
+
+    location / {
+        return 301 https://\$host\$request_uri;
+    }
+}
+
+server {
+    listen 443 ssl;
+    server_name {$newDomain};
+
+    ssl_certificate     /etc/nginx/ssl/cert.pem;
+    ssl_certificate_key /etc/nginx/ssl/key.pem;
+
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_ciphers HIGH:!aNULL:!MD5;
+    ssl_prefer_server_ciphers on;
+
+    root /var/www/html;
+    index index.php index.html;
+
+    access_log /etc/nginx/rules/access.log;
+    error_log /etc/nginx/rules/error.log;
+
+    include /etc/nginx/rules/ip_blacklist.conf;
+    include /etc/nginx/rules/ua_blacklist.conf;
+    include /etc/nginx/rules/token_blacklist.conf;
+
+    location / {
+        try_files \$uri \$uri/ @proxy;
+    }
+
+    location ~ \\.php\$ {
+        fastcgi_pass   submonitor-php:9000;
+        fastcgi_index  index.php;
+        fastcgi_param  SCRIPT_FILENAME \$document_root\$fastcgi_script_name;
+        include        fastcgi_params;
+    }
+
+    location @proxy {
+        resolver 8.8.8.8 1.1.1.1 valid=30s;
+        proxy_pass {$upstreamTarget};
+        
+        proxy_set_header Host \$http_host;
+        proxy_set_header X-Real-IP \$remote_addr;
+        proxy_set_header X-Forwarded-For \$proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        
+        proxy_ssl_server_name on;
+        proxy_ssl_name \$http_host;
+    }
+
+    location ~ /\\. {
+        deny all;
+    }
+}
+EOF;
+        } else {
+            // 如果已经有标准的 HTTPS 结构，仅替换 server_name
+            $newConf = preg_replace('/\bserver_name\s+[^;]+;/', "server_name {$newDomain};", $conf);
+        }
         
         if (!safeWriteFile($confPath, $newConf)) {
             echo json_encode([
