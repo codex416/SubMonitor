@@ -1,5 +1,7 @@
 <?php
-session_start();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
 if (!isset($_SESSION['login_time']) || time() - $_SESSION['login_time'] > 86400) {
     $_SESSION['is_logged_in'] = false;
 }
