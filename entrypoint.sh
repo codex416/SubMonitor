@@ -21,7 +21,7 @@ chmod 666 /etc/nginx/rules/*.conf 2>/dev/null || true
 echo "[Init] 权限初始化完成！"
 
 # ========================================================
-# ✅ 自动生成管理员密码（仅首次，算法与PHP完全一致）
+# ✅ 自动生成密码 —— PHP 原生哈希，永久匹配！
 # ========================================================
 PASS_FILE="/etc/nginx/rules/.htpasswd"
 PASS_FILE_HOST="/rules/.htpasswd"
@@ -29,7 +29,7 @@ PASS_FILE_HOST="/rules/.htpasswd"
 if [ ! -f "$PASS_FILE" ] && [ ! -f "$PASS_FILE_HOST" ]; then
     echo "[Init] 首次部署，正在生成管理员密码..."
 
-    # ✅ 确保12位完整密码，不截断
+    # 生成 12 位完整密码
     ADMIN_PASS=""
     while [ ${#ADMIN_PASS} -lt 12 ]; do
         RAW=$(head -c 64 /dev/urandom | tr -dc 'A-Za-z0-9')
@@ -37,12 +37,12 @@ if [ ! -f "$PASS_FILE" ] && [ ! -f "$PASS_FILE_HOST" ]; then
     done
     ADMIN_PASS=$(echo "$ADMIN_PASS" | cut -c 1-12)
 
-    # ✅ echo -n 与 auth.php 哈希算法 100% 一致，不再403！
+    # ✅ 改用 PHP 原生计算哈希 → 与 auth.php 完全一致！永不403！
     SALT=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')
-    PASS_HASH=$(echo -n "${ADMIN_PASS}${SALT}" | sha256sum | awk '{print $1}')
+    PASS_HASH=$(php -r "echo hash('sha256', '${ADMIN_PASS}${SALT}');")
     HT_LINE="sha256:${SALT}:${PASS_HASH}"
 
-    # ✅ 同时写入容器内+挂载目录，Nginx/PHP/宿主机三方一致
+    # 同步写入容器内 + 挂载目录
     echo "$HT_LINE" > "$PASS_FILE"
     chmod 666 "$PASS_FILE"
     if [ -d "/rules" ]; then
@@ -53,7 +53,7 @@ if [ ! -f "$PASS_FILE" ] && [ ! -f "$PASS_FILE_HOST" ]; then
     echo "[Init] ==================================================="
     echo "[Init] ✅ 管理员密码已生成！"
     echo "[Init] 🔑 登录密码: $ADMIN_PASS"
-    echo "[Init] ⚠️  复制密码直接登录！登录后可在面板修改密码！"
+    echo "[Init] ⚠️  直接复制密码登录！登录后可在面板修改！"
     echo "[Init] ==================================================="
 fi
 
@@ -62,7 +62,7 @@ fi
 # ========================================================
 apk add --no-cache curl openssl socat >/dev/null 2>&1
 
-# 生成自签名证书
+# 自签名证书
 if [ ! -f /etc/nginx/ssl/cert.pem ] || [ ! -f /etc/nginx/ssl/key.pem ]; then
   openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
     -keyout /etc/nginx/ssl/key.pem \
@@ -81,10 +81,9 @@ if [ ! -f /root/.acme.sh/acme.sh ]; then
 fi
 
 # ========================================================
-# 3. 后台轮询：证书申请 + 配置重载
+# 3. 后台任务：证书申请 + 配置重载
 # ========================================================
 (while true; do
-  # 域名证书申请
   if [ -f /etc/nginx/rules/.cert_flag ]; then
     DOMAIN=$(cat /etc/nginx/rules/.cert_flag | tr -d '\r\n ')
     rm -f /etc/nginx/rules/.cert_flag
@@ -121,7 +120,6 @@ fi
     fi
   fi
 
-  # Nginx 配置重载
   if [ -f /etc/nginx/rules/.reload_flag ]; then
     rm -f /etc/nginx/rules/.reload_flag
     nginx -s reload >/dev/null 2>&1
