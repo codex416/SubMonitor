@@ -4,7 +4,7 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 // ===================== 👇 请务必修改为你的管理密码 👇 =====================
-define('ADMIN_PASSWORD', '在这里改成你自己的强密码');
+define('ADMIN_PASSWORD', 'admin');
 // 会话有效期（秒），默认 24 小时 = 86400
 define('SESSION_EXPIRE', 86400);
 // 是否开启 IP/User-Agent 绑定（防会话劫持）
