@@ -21,14 +21,21 @@ chmod 666 /etc/nginx/rules/*.conf 2>/dev/null || true
 echo "[Init] 权限初始化完成！"
 
 # ========================================================
-# ✅ 自动生成管理员密码（仅首次，修复空密码问题）
+# ✅ 自动生成管理员密码（仅首次，不依赖 xxd，确保 12 位完整）
 # ========================================================
 if [ ! -f /etc/nginx/rules/.htpasswd ]; then
     echo "[Init] 首次部署，正在生成管理员密码..."
     
-    # 兼容所有环境生成 12 位字母数字混合密码
-    ADMIN_PASS=$(head -c 12 /dev/urandom | tr -dc 'A-Za-z0-9' | head -c 12)
-    SALT=$(head -c 8 /dev/urandom | xxd -p)
+    # 循环补足，确保 12 位，不截断
+    ADMIN_PASS=""
+    while [ ${#ADMIN_PASS} -lt 12 ]; do
+        RAW=$(head -c 64 /dev/urandom | tr -dc 'A-Za-z0-9')
+        ADMIN_PASS="${ADMIN_PASS}${RAW}"
+    done
+    ADMIN_PASS=$(printf "%s" "$ADMIN_PASS" | cut -c 1-12)
+
+    # 用 od 替代 xxd，所有 Alpine 环境都可用
+    SALT=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')
     PASS_HASH=$(printf "%s%s" "$ADMIN_PASS" "$SALT" | sha256sum | awk '{print $1}')
     
     echo "sha256:${SALT}:${PASS_HASH}" > /etc/nginx/rules/.htpasswd
