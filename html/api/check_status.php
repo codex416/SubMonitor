@@ -1,11 +1,57 @@
 <?php
-// 引入鉴权文件，未登录会被直接拦截并返回 401
-require_once __DIR__ . '/auth.php';
+// 【必须置顶】前无任何输出
+session_start();
+header('Content-Type: application/json; charset=utf-8');
 
-// 如果没有被 auth.php 拦截，说明已经处于登录状态
-header('Content-Type: application/json');
-echo json_encode([
-    'code' => 200, 
-    'message' => '已登录'
-]);
-?>
+// 与 login.php 保持一致的配置
+define('SESSION_EXPIRE', 86400);
+define('BIND_CLIENT_INFO', true);
+
+/**
+ * 统一鉴权 —— 与 login.php / auth.php 完全一致
+ */
+function isAuthorized() {
+    $baseCheck = isset($_SESSION['is_logged_in'])
+        && $_SESSION['is_logged_in'] === true
+        && isset($_SESSION['login_time'])
+        && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+    if (!$baseCheck) return false;
+
+    if (BIND_CLIENT_INFO) {
+        $sameIp = ($_SESSION['client_ip'] ?? '') === ($_SERVER['REMOTE_ADDR'] ?? '');
+        $sameUa = ($_SESSION['client_ua'] ?? '') === ($_SERVER['HTTP_USER_AGENT'] ?? '');
+        return $sameIp && $sameUa;
+    }
+    return true;
+}
+
+// ======================================
+// 主逻辑：查询系统/登录状态
+// ======================================
+if (isAuthorized()) {
+    $remain = SESSION_EXPIRE - (time() - ($_SESSION['login_time'] ?? time()));
+    http_response_code(200);
+    echo json_encode([
+        'code' => 200,
+        'msg'  => '运行正常',
+        'data' => [
+            'system_status' => 'online',
+            'is_logged_in'  => true,
+            'session_remain_seconds' => $remain > 0 ? $remain : 0,
+            'timestamp'     => time()
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+} else {
+    session_unset();
+    session_destroy();
+    http_response_code(401);
+    echo json_encode([
+        'code' => 401,
+        'msg'  => '未登录或会话已过期',
+        'data' => [
+            'system_status' => 'online',
+            'is_logged_in'  => false
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+}
+exit;
