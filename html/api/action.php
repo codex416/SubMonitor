@@ -39,7 +39,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// 路由：更新反代域名
+// 路由：更新反代域名 ✅ 同时替换 set变量 / proxy_pass / Host
 // ========================================================
 if ($action==='update_upstream') {
     $t=trim($inputData['target_domain']??$_POST['target_domain']??'');
@@ -47,12 +47,13 @@ if ($action==='update_upstream') {
     $t=preg_replace('/^https?:\/\//i','',$t); $t=rtrim($t,'/');
     if (!file_exists(NGINX_CONF)) { echo json_encode(['status'=>'error','message'=>'找不到Nginx配置文件'],JSON_UNESCAPED_UNICODE); exit; }
     $c=file_get_contents(NGINX_CONF);
-    $c=preg_replace('/proxy_pass\s+[^;]+;/i',"proxy_pass https://{$t};",$c);
+    // ✅ 三处同时替换，确保配置一致
+    $c=preg_replace('/set\s+\$backend_url\s+"https?:\/\/[^"]+";/i',"set \$backend_url \"https://{$t}\";",$c);
+    $c=preg_replace('/proxy_pass\s+https?:\/\/[^\/;\s]+;/i',"proxy_pass https://{$t};",$c);
     $c=preg_replace('/proxy_set_header\s+Host\s+[^;]+;/i',"proxy_set_header Host {$t};",$c);
-    $c=preg_replace('/proxy_ssl_name\s+[^;]+;/i',"proxy_ssl_name {$t};",$c);
     if (!safeWriteFile(NGINX_CONF,$c)) { echo json_encode(['status'=>'error','message'=>'写入配置失败，请检查挂载权限'],JSON_UNESCAPED_UNICODE); exit; }
     
-    // ✅ 改用原生写入标记 + 立即重载 Nginx
+    // ✅ 原生写重载标记 + 立即重载 Nginx
     @file_put_contents($reloadFlag, (string)time());
     @exec('nginx -s reload >/dev/null 2>&1 &');
     echo json_encode(['status'=>'success','message'=>"反代域名已更新：{$t}，配置已生效"],JSON_UNESCAPED_UNICODE); exit;
@@ -70,7 +71,7 @@ if ($action==='apply_cert' || $action==='update_domain') {
 }
 
 // ========================================================
-// 路由：证书状态
+// 路由：证书状态 ✅ 增强解析兼容性
 // ========================================================
 if ($action==='cert_status') {
     $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
@@ -82,7 +83,7 @@ if ($action==='cert_status') {
         }
     }
 
-    // 读取配置中的域名并解析证书
+    // 读取配置中的域名
     if (file_exists(NGINX_CONF) && preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i',file_get_contents(NGINX_CONF),$m)) $u=trim($m[1]);
     if (empty($u)) { echo json_encode(['status'=>'success','cert'=>null,'msg'=>'尚未配置域名'],JSON_UNESCAPED_UNICODE); exit; }
 
@@ -92,7 +93,7 @@ if ($action==='cert_status') {
     $pem = @file_get_contents($certPath);
     if (!$pem) { echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书文件读取失败'],JSON_UNESCAPED_UNICODE); exit; }
 
-    // 解析证书有效期
+    // 提取第一张证书（叶子证书）
     $certs = [];
     if (preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s',$pem,$m)) {
         $certs = $m[0];
@@ -100,13 +101,17 @@ if ($action==='cert_status') {
     $leaf = $certs[0] ?? '';
     $valid_to = $issuer = '';
 
-    // 提取有效期
-    if (preg_match('/Not After\s*:\s*(.+)/',$leaf,$m)) $valid_to = trim($m[1]);
-    // 提取颁发者
-    if (preg_match('/Issuer\s*=\s*\/?CN\s*=\s*([^,\n\/]+)/',$leaf,$m)) $issuer = trim($m[1]);
-    if (empty($issuer) && preg_match('/Issuer:\s*CN=([^,\n]+)/',$leaf,$m)) $issuer = trim($m[1]);
+    // ✅ 兼容多种日期格式（Let's Encrypt / 自签名）
+    if (preg_match('/Not After\s*[:=]\s*(.+)/i',$leaf,$m)) {
+        $valid_to = trim($m[1]);
+    }
+    // ✅ 兼容多种颁发者格式
+    if (preg_match('/Issuer\s*[:=]\s*.*?CN\s*=\s*([^,\n\/]+)/i',$leaf,$m)) {
+        $issuer = trim($m[1]);
+    }
+    if (empty($issuer)) $issuer = 'Self-Signed';
 
-    // 格式化日期
+    // 格式化时间
     $ts = $valid_to ? strtotime($valid_to) : 0;
     $daysLeft = $ts ? ceil(($ts - time())/86400) : 0;
     $fmtDate = $ts ? date('Y-m-d H:i:s',$ts) : '';
@@ -115,7 +120,7 @@ if ($action==='cert_status') {
         'status'=>'success',
         'cert'=>[
             'domain'=>$u,
-            'issuer'=>$issuer?: '未知',
+            'issuer'=>$issuer,
             'valid_to'=>$fmtDate,
             'days_left'=>$daysLeft>0 ? $daysLeft : 0
         ]
@@ -170,7 +175,7 @@ if ($action==='get_config') {
 }
 
 // ========================================================
-// 路由：修改密码
+// 路由：修改密码 ✅ 增强文件缺失提示
 // ========================================================
 if ($action==='change_password') {
     $pwdFile = RULES_DIR.'.htpasswd';
@@ -184,10 +189,14 @@ if ($action==='change_password') {
         echo json_encode(['status'=>'error','message'=>'新密码长度至少6位'],JSON_UNESCAPED_UNICODE); exit;
     }
 
-    // 验证旧密码
+    // ✅ 明确提示文件缺失
+    if (!file_exists($pwdFile)) {
+        echo json_encode(['status'=>'error','message'=>'密码文件不存在，请在服务器执行命令创建'],JSON_UNESCAPED_UNICODE); exit;
+    }
+
     $hash = trim(@file_get_contents($pwdFile));
     if (empty($hash)) {
-        echo json_encode(['status'=>'error','message'=>'密码文件不存在，请检查权限'],JSON_UNESCAPED_UNICODE); exit;
+        echo json_encode(['status'=>'error','message'=>'密码文件为空，请重新创建'],JSON_UNESCAPED_UNICODE); exit;
     }
 
     list($algo, $salt, $hashed) = explode(':', $hash . '::');
@@ -196,7 +205,6 @@ if ($action==='change_password') {
         echo json_encode(['status'=>'error','message'=>'旧密码错误'],JSON_UNESCAPED_UNICODE); exit;
     }
 
-    // 生成新密码哈希
     $salt = bin2hex(random_bytes(8));
     $newHash = 'sha256:' . $salt . ':' . hash('sha256', $new . $salt);
     if (safeWriteFile($pwdFile, $newHash)) {
