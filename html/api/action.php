@@ -1,9 +1,11 @@
 <?php
 require_once __DIR__ . '/auth.php';
 
+// 统一用容器内标准路径，确保100%能找到文件！
 define('RULES_DIR',    '/etc/nginx/rules/');
 define('NGINX_CONF',   '/etc/nginx/conf.d/default.conf');
 define('SSL_DIR',      '/etc/nginx/ssl/');
+define('LOGIN_PHP',    __DIR__ . '/login.php'); // = /var/www/html/api/login.php
 
 header('Content-Type: application/json; charset=utf-8');
 require_login();
@@ -12,7 +14,8 @@ $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = trim($inputData['action'] ?? $_POST['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
-foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF)] as $dir) {
+// 强制确保所有目录存在+可写
+foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP)] as $dir) {
     if (!is_dir($dir)) @mkdir($dir, 0777, true);
     @chmod($dir, 0777);
 }
@@ -41,7 +44,7 @@ if ($action === 'update_upstream') {
     $t = preg_replace('/^https?:\/\//i', '', $t);
     $t = rtrim($t, '/');
     if (!file_exists(NGINX_CONF)) {
-        echo json_encode(['status'=>'error','message'=>'找不到Nginx配置文件'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'error','message'=>'找不到Nginx配置文件：'.NGINX_CONF], JSON_UNESCAPED_UNICODE);
         exit;
     }
     $c = file_get_contents(NGINX_CONF);
@@ -49,12 +52,12 @@ if ($action === 'update_upstream') {
     $c = preg_replace('/proxy_pass\s+https?:\/\/[^\/;\s]+;/i', "proxy_pass https://{$t};", $c);
     $c = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/i', "proxy_set_header Host {$t};", $c);
     if (!safeWriteFile(NGINX_CONF, $c)) {
-        echo json_encode(['status'=>'error','message'=>'写入配置失败，请检查挂载权限'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'error','message'=>'写入配置失败，请检查权限'], JSON_UNESCAPED_UNICODE);
         exit;
     }
     @file_put_contents($reloadFlag, (string)time());
     @exec('nginx -s reload >/dev/null 2>&1 &');
-    echo json_encode(['status'=>'success','message'=>"反代域名已更新：{$t}，配置已生效"], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新：{$t}，配置已生效"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -67,12 +70,14 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
         echo json_encode(['status'=>'error','message'=>'域名不能为空'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    safeWriteFile(RULES_DIR . '.cert_flag', "{$d}\n");
-    safeWriteFile(RULES_DIR . 'cert_status.json', json_encode([
-        'status'=>'processing',
-        'msg'=>"域名 {$d} 已提交，后台正在申请证书..."
+    if (!safeWriteFile(RULES_DIR.'.cert_flag', "{$d}\n")) {
+        echo json_encode(['status'=>'error','message'=>'写入证书申请标记失败'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    safeWriteFile(RULES_DIR.'cert_status.json', json_encode([
+        'status'=>'processing','msg'=>"🔄 域名 {$d} 已提交，后台正在申请证书..."
     ]));
-    echo json_encode(['status'=>'success','message'=>"域名 {$d} 已保存，证书申请已在后台启动"], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status'=>'success','message'=>"✅ 域名 {$d} 已保存，证书申请已在后台启动"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -80,15 +85,11 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 // ✅ 获取证书状态
 // ========================================================
 if ($action === 'cert_status') {
-    $certJson = @file_get_contents(RULES_DIR . 'cert_status.json');
+    $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
     if ($certJson) {
         $certData = json_decode($certJson, true);
-        if ($certData && ($certData['status'] === 'success' || isset($certData['cert']))) {
-            echo json_encode([
-                'status'=>'success',
-                'cert'=>$certData['cert'] ?? null,
-                'msg'=>$certData['msg'] ?? ''
-            ], JSON_UNESCAPED_UNICODE);
+        if ($certData && ($certData['status']==='success' || isset($certData['cert']))) {
+            echo json_encode(['status'=>'success','cert'=>$certData['cert']??null,'msg'=>$certData['msg']??''], JSON_UNESCAPED_UNICODE);
             exit;
         }
     }
@@ -102,7 +103,7 @@ if ($action === 'cert_status') {
         exit;
     }
 
-    $certPath = SSL_DIR . 'cert.pem';
+    $certPath = SSL_DIR.'cert.pem';
     if (!file_exists($certPath)) {
         echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -165,9 +166,9 @@ if ($action === 'update_blacklist') {
     @exec('nginx -s reload >/dev/null 2>&1 &');
 
     if ($ok1 && $ok2 && $ok3) {
-        echo json_encode(['status'=>'success','message'=>'黑名单已更新，配置已生效'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'success','message'=>'✅ 黑名单已更新，配置已生效'], JSON_UNESCAPED_UNICODE);
     } else {
-        echo json_encode(['status'=>'error','message'=>'部分文件写入失败'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'error','message'=>'⚠️ 部分文件写入失败'], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
@@ -194,7 +195,7 @@ if ($action === 'get_config') {
 }
 
 // ========================================================
-// ✅ 修改密码 —— 直接更新 login.php 明文，不需要哈希/旧密码文件！
+// ✅ 修改密码 —— 路径+调试全修复，明确提示文件位置！
 // ========================================================
 if ($action === 'change_password') {
     $new = trim($inputData['new_password'] ?? '');
@@ -207,25 +208,28 @@ if ($action === 'change_password') {
         exit;
     }
 
-    $file = __DIR__ . '/login.php';
-    if (!file_exists($file)) {
-        echo json_encode(['status'=>'error','message'=>'找不到密码配置文件'], JSON_UNESCAPED_UNICODE);
+    // ✅ 明确显示路径，方便排查！
+    if (!file_exists(LOGIN_PHP)) {
+        echo json_encode(['status'=>'error','message'=>'❌ 找不到文件：'.LOGIN_PHP], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (!is_writable(LOGIN_PHP)) {
+        echo json_encode(['status'=>'error','message'=>'❌ 文件不可写：'.LOGIN_PHP], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $content = file_get_contents($file);
+    $content = file_get_contents(LOGIN_PHP);
     $newLine = "define('ADMIN_PASSWORD', '{$new}');";
     $content = preg_replace("/define\('ADMIN_PASSWORD',[^;]+;/", $newLine, $content);
 
-    if (file_put_contents($file, $content)) {
-        echo json_encode(['status'=>'success','message'=>'密码修改成功！下次登录用新密码'], JSON_UNESCAPED_UNICODE);
+    if (file_put_contents(LOGIN_PHP, $content)) {
+        @chmod(LOGIN_PHP, 0666);
+        echo json_encode(['status'=>'success','message'=>'✅ 密码修改成功！下次登录用新密码'], JSON_UNESCAPED_UNICODE);
     } else {
-        echo json_encode(['status'=>'error','message'=>'密码写入失败，请检查文件权限'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'error','message'=>'❌ 写入失败：权限不足'], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
 
 // ========================================================
-// 未知路由
-// ========================================================
-echo json_encode(['status'=>'error','message'=>'未知操作'], JSON_UNESCAPED_UNICODE);
+echo json_encode(['status'=>'error','message'=>'⚠️ 未知操作'], JSON_UNESCAPED_UNICODE);
