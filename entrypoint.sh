@@ -21,6 +21,25 @@ chmod 666 /etc/nginx/rules/*.conf 2>/dev/null || true
 echo "[Init] 权限初始化完成！"
 
 # ========================================================
+# ✅ 新增：自动生成管理员密码（仅首次）
+# ========================================================
+if [ ! -f /etc/nginx/rules/.htpasswd ]; then
+    echo "[Init] 首次部署，正在生成管理员密码..."
+    # 生成 16 位随机强密码
+    ADMIN_PASS=$(openssl rand -base64 12)
+    SALT=$(openssl rand -hex 8)
+    PASS_HASH=$(printf "%s%s" "$ADMIN_PASS" "$SALT" | sha256sum | awk '{print $1}')
+    echo "sha256:${SALT}:${PASS_HASH}" > /etc/nginx/rules/.htpasswd
+    chmod 666 /etc/nginx/rules/.htpasswd
+    echo "[Init] ==================================================="
+    echo "[Init] ✅ 管理员密码已生成！"
+    echo "[Init] 🔑 用户名: admin"
+    echo "[Init] 🔑 密码: $ADMIN_PASS"
+    echo "[Init] ⚠️  请立即保存此密码！以后可在面板修改！"
+    echo "[Init] ==================================================="
+fi
+
+# ========================================================
 # 2. 安装依赖与证书环境
 # ========================================================
 apk add --no-cache curl openssl socat >/dev/null 2>&1
