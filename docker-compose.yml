@@ -2,7 +2,7 @@ services:
   php:
     image: php:8.2-fpm-alpine
     container_name: submonitor-php
-    user: root # 关键：赋予 root 权限，解决 Alpine 下 FPM 无权修改挂载文件的问题
+    user: root
     restart: always
     volumes:
       - ./html:/var/www/html
@@ -28,9 +28,8 @@ services:
       - log-data:/var/log/nginx
     depends_on:
       - php
-    # 【修复版】在入口处强制修复所有挂载目录的权限，确保面板随时有权写入配置和申请证书
     entrypoint: [
-      "sh", "-c", 
+      "sh", "-c",
       "chmod +x /entrypoint.sh && chmod -R 777 /var/www/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
     ]
 
