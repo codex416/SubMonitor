@@ -1,34 +1,264 @@
-<!-- login.html -->
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <!-- 关键：适配手机浏览器顶部栏，消除色差 -->
+    <meta name="theme-color" content="#ffffff">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
     <title>SubMonitor 登录</title>
     <style>
-        body { background: #1a1c24; display: flex; justify-content: center; align-items: center; height: 100vh; color: #fff; font-family: sans-serif; }
-        .login-box { background: #252a36; padding: 2rem; border-radius: 8px; box-shadow: 0 4px 15px rgba(0,0,0,0.3); width: 300px; }
-        input { width: 100%; padding: 10px; margin: 10px 0; border-radius: 4px; border: none; box-sizing: border-box; }
-        button { width: 100%; padding: 10px; background: #007bff; color: #fff; border: none; border-radius: 4px; cursor: pointer; }
+        :root {
+            --primary: #2563eb;
+            --primary-light: #3b82f6;
+            --primary-hover: #1d4ed8;
+            --bg-page: #ffffff;
+            --bg-card: #ffffff;
+            --bg-input: #f8fafc;
+            --border: #e2e8f0;
+            --border-focus: #2563eb;
+            --text-main: #1e293b;
+            --text-secondary: #64748b;
+            --text-placeholder: #94a3b8;
+            --error: #dc2626;
+            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
+            --shadow-card: 0 10px 40px rgba(37, 99, 235, 0.08);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html, body {
+            height: 100%;
+            min-height: 100vh;
+        }
+
+        body {
+            background-color: var(--bg-page);
+            color: var(--text-main);
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 16px;
+        }
+
+        .login-card {
+            width: 100%;
+            max-width: 400px;
+            background: var(--bg-card);
+            border-radius: 16px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            padding: 2.5rem 2rem;
+            animation: cardIn 0.6s ease-out both;
+        }
+
+        @keyframes cardIn {
+            from {
+                opacity: 0;
+                transform: translateY(12px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        .login-header {
+            text-align: center;
+            margin-bottom: 2.2rem;
+        }
+
+        .login-header h2 {
+            font-size: 1.55rem;
+            font-weight: 700;
+            color: var(--text-main);
+            margin-bottom: 0.4rem;
+            letter-spacing: 0.3px;
+        }
+
+        .login-header p {
+            font-size: 0.95rem;
+            color: var(--text-secondary);
+        }
+
+        .input-wrap {
+            margin-bottom: 1.25rem;
+        }
+
+        .input-wrap label {
+            display: block;
+            margin-bottom: 0.55rem;
+            font-size: 0.92rem;
+            color: var(--text-main);
+            font-weight: 500;
+        }
+
+        .input-wrap input {
+            width: 100%;
+            padding: 0.95rem 1.1rem;
+            background: var(--bg-input);
+            border: 1.5px solid var(--border);
+            border-radius: 10px;
+            color: var(--text-main);
+            font-size: 1rem;
+            outline: none;
+            transition: all 0.22s ease;
+        }
+
+        .input-wrap input::placeholder {
+            color: var(--text-placeholder);
+        }
+
+        .input-wrap input:focus {
+            border-color: var(--border-focus);
+            background: #fff;
+            box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
+        }
+
+        .submit-btn {
+            width: 100%;
+            padding: 0.95rem;
+            margin-top: 0.3rem;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: #ffffff;
+            border: none;
+            border-radius: 10px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.22s ease;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+        }
+
+        .submit-btn:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+        }
+
+        .submit-btn:active {
+            transform: translateY(0);
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.15);
+        }
+
+        .submit-btn:disabled {
+            opacity: 0.65;
+            cursor: not-allowed;
+            transform: none;
+            box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
+        }
+
+        .error-box {
+            margin-top: 1.1rem;
+            padding: 0.8rem 1rem;
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            border-radius: 10px;
+            color: var(--error);
+            font-size: 0.9rem;
+            text-align: center;
+            display: none;
+        }
+
+        .error-box.show {
+            display: block;
+            animation: shake 0.35s ease-out;
+        }
+
+        @keyframes shake {
+            0%,100%{transform:translateX(0)}
+            25%{transform:translateX(-5px)}
+            75%{transform:translateX(5px)}
+        }
+
+        @media (max-width: 480px) {
+            body {
+                padding: 12px;
+            }
+            .login-card {
+                padding: 2rem 1.4rem;
+                border-radius: 14px;
+            }
+            .login-header h2 {
+                font-size: 1.4rem;
+            }
+        }
     </style>
 </head>
 <body>
-    <div class="login-box">
-        <h3>系统登录</h3>
-        <input type="password" id="password" placeholder="请输入管理密码">
-        <button onclick="handleLogin()">进入控制台</button>
+    <div class="login-card">
+        <div class="login-header">
+            <h2>SubMonitor</h2>
+            <p>系统登录 · 请验证管理密码</p>
+        </div>
+        <div class="input-wrap">
+            <label>管理密码</label>
+            <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+        </div>
+        <button class="submit-btn" id="loginBtn">进入控制台</button>
+        <div class="error-box" id="errorTip"></div>
     </div>
+
     <script>
-        function handleLogin() {
-            const password = document.getElementById('password').value;
-            fetch('/api/login.php', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/x-www-form-urlencoded'},
-                body: 'password=' + encodeURIComponent(password)
-            }).then(r => r.json()).then(res => {
-                if(res.code === 200) window.location.href = '/';
-                else alert('密码错误');
-            });
-        }
+        document.addEventListener('DOMContentLoaded', () => {
+            const loginBtn = document.getElementById('loginBtn');
+            const passwordInput = document.getElementById('password');
+            const errorTip = document.getElementById('errorTip');
+
+            loginBtn.addEventListener('click', handleLogin);
+            passwordInput.addEventListener('keydown', e => e.key === 'Enter' && handleLogin());
+
+            async function handleLogin() {
+                const password = passwordInput.value.trim();
+                errorTip.classList.remove('show');
+                errorTip.textContent = '';
+
+                if (!password) {
+                    showError('请输入管理密码');
+                    passwordInput.focus();
+                    return;
+                }
+
+                loginBtn.disabled = true;
+                loginBtn.textContent = '校验中...';
+
+                try {
+                    const res = await fetch('/api/login.php', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                        body: 'password=' + encodeURIComponent(password)
+                    });
+
+                    if (!res.ok) throw new Error(`服务器错误 (${res.status})`);
+                    const data = await res.json();
+
+                    if (data.code === 200) {
+                        loginBtn.textContent = '登录成功';
+                        setTimeout(() => location.href = '/', 360);
+                    } else {
+                        showError(data.msg || '密码错误，请核对后重试');
+                        passwordInput.value = '';
+                        passwordInput.focus();
+                    }
+                } catch (err) {
+                    showError(err.message || '请求异常，请稍后重试');
+                } finally {
+                    loginBtn.disabled = false;
+                    loginBtn.textContent = '进入控制台';
+                }
+            }
+
+            function showError(text) {
+                errorTip.textContent = text;
+                errorTip.classList.add('show');
+            }
+        });
     </script>
 </body>
 </html>
