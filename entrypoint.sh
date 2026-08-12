@@ -21,15 +21,15 @@ chmod 666 /etc/nginx/rules/*.conf 2>/dev/null || true
 echo "[Init] 权限初始化完成！"
 
 # ========================================================
-# ✅ 自动生成管理员密码（仅首次，算法与PHP完全一致，三方同步）
+# ✅ 自动生成管理员密码（仅首次，算法与PHP完全一致）
 # ========================================================
-PASS_FILE_HOST="/etc/nginx/rules/.htpasswd"
-PASS_FILE_MOUNT="/rules/.htpasswd"
+PASS_FILE="/etc/nginx/rules/.htpasswd"
+PASS_FILE_HOST="/rules/.htpasswd"
 
-if [ ! -f "$PASS_FILE_HOST" ] && [ ! -f "$PASS_FILE_MOUNT" ]; then
+if [ ! -f "$PASS_FILE" ] && [ ! -f "$PASS_FILE_HOST" ]; then
     echo "[Init] 首次部署，正在生成管理员密码..."
-    
-    # ✅ 循环补足，确保 12 位完整密码，不截断
+
+    # ✅ 确保12位完整密码，不截断
     ADMIN_PASS=""
     while [ ${#ADMIN_PASS} -lt 12 ]; do
         RAW=$(head -c 64 /dev/urandom | tr -dc 'A-Za-z0-9')
@@ -37,24 +37,23 @@ if [ ! -f "$PASS_FILE_HOST" ] && [ ! -f "$PASS_FILE_MOUNT" ]; then
     done
     ADMIN_PASS=$(echo "$ADMIN_PASS" | cut -c 1-12)
 
-    # ✅ 改用 echo -n，与 auth.php 哈希算法 100% 一致！
+    # ✅ echo -n 与 auth.php 哈希算法 100% 一致，不再403！
     SALT=$(head -c 8 /dev/urandom | od -An -tx1 | tr -d ' \n')
     PASS_HASH=$(echo -n "${ADMIN_PASS}${SALT}" | sha256sum | awk '{print $1}')
-    HT_PASS_LINE="sha256:${SALT}:${PASS_HASH}"
-    
-    # ✅ 同时写入容器内 + 挂载宿主机，保证 Nginx/PHP/宿主机 三方一致
-    echo "$HT_PASS_LINE" > "$PASS_FILE_HOST"
-    chmod 666 "$PASS_FILE_HOST"
-    
+    HT_LINE="sha256:${SALT}:${PASS_HASH}"
+
+    # ✅ 同时写入容器内+挂载目录，Nginx/PHP/宿主机三方一致
+    echo "$HT_LINE" > "$PASS_FILE"
+    chmod 666 "$PASS_FILE"
     if [ -d "/rules" ]; then
-        echo "$HT_PASS_LINE" > "$PASS_FILE_MOUNT"
-        chmod 666 "$PASS_FILE_MOUNT"
+        echo "$HT_LINE" > "$PASS_FILE_HOST"
+        chmod 666 "$PASS_FILE_HOST"
     fi
 
     echo "[Init] ==================================================="
     echo "[Init] ✅ 管理员密码已生成！"
     echo "[Init] 🔑 登录密码: $ADMIN_PASS"
-    echo "[Init] ⚠️  请立即保存！登录后可在面板修改密码！"
+    echo "[Init] ⚠️  复制密码直接登录！登录后可在面板修改密码！"
     echo "[Init] ==================================================="
 fi
 
