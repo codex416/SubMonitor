@@ -12,7 +12,6 @@ header('Content-Type: application/json; charset=utf-8');
 require_login();
 
 $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
-// 【修复点】：在这里加上 $_GET['action'] 的支持
 $action = trim($inputData['action'] ?? $_POST['action'] ?? $_GET['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
@@ -84,54 +83,64 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态
+// ✅ 获取证书状态（优先真实解析 cert.pem，彻底解决卡在 processing 的问题）
 // ========================================================
 if ($action === 'cert_status') {
+    $certPath = SSL_DIR.'cert.pem';
+    
+    // 1. 优先检查真实证书文件是否存在
+    if (file_exists($certPath)) {
+        $pem = @file_get_contents($certPath);
+        if ($pem && preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
+            $leaf = $m[0][0] ?? '';
+            $certData = openssl_x509_parse($leaf);
+            
+            if ($certData) {
+                $validToTime = $certData['validTo_time_t'] ?? time();
+                $valid_to = date('Y-m-d H:i:s', $validToTime);
+                $daysLeft = ceil(($validToTime - time()) / 86400);
+                
+                $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
+                
+                // 尝试从 domain.conf 或证书 subject 中获取域名
+                $domain = 'sub.befriends.wiki';
+                if (file_exists(RULES_DIR.'domain.conf')) {
+                    $d = trim(file_get_contents(RULES_DIR.'domain.conf'));
+                    if (!empty($d)) $domain = $d;
+                }
+                if (empty($domain) && isset($certData['subject']['CN'])) {
+                    $domain = $certData['subject']['CN'];
+                }
+
+                echo json_encode([
+                    'status'=>'success',
+                    'cert'=>[
+                        'domain'=>$domain,
+                        'issuer'=>$issuer,
+                        'valid_to'=>$valid_to,
+                        'days_left'=>$daysLeft > 0 ? $daysLeft : 0
+                    ]
+                ], JSON_UNESCAPED_UNICODE);
+                exit;
+            }
+        }
+    }
+
+    // 2. 如果没有真实证书，再读取 cert_status.json 提示信息
     $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
     if ($certJson) {
         $certData = json_decode($certJson, true);
-        if ($certData && ($certData['status']==='success' || isset($certData['cert']))) {
-            echo json_encode(['status'=>'success','cert'=>$certData['cert']??null,'msg'=>$certData['msg']??''], JSON_UNESCAPED_UNICODE);
+        if ($certData) {
+            echo json_encode([
+                'status'=>'success',
+                'cert'=>$certData['cert'] ?? null,
+                'msg'=>$certData['msg'] ?? ''
+            ], JSON_UNESCAPED_UNICODE);
             exit;
         }
     }
 
-    $certPath = SSL_DIR.'cert.pem';
-    if (!file_exists($certPath)) {
-        echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $pem = @file_get_contents($certPath);
-    if (!$pem || !preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
-        echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书文件读取失败'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $leaf = $m[0][0] ?? '';
-    $certData = openssl_x509_parse($leaf);
-    
-    if (!$certData) {
-        echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书解析失败'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $validToTime = $certData['validTo_time_t'] ?? time();
-    $valid_to = date('Y-m-d H:i:s', $validToTime);
-    $daysLeft = ceil(($validToTime - time()) / 86400);
-    
-    $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
-    $domain = $certData['subject']['CN'] ?? 'sub.befriends.wiki';
-
-    echo json_encode([
-        'status'=>'success',
-        'cert'=>[
-            'domain'=>$domain,
-            'issuer'=>$issuer,
-            'valid_to'=>$valid_to,
-            'days_left'=>$daysLeft > 0 ? $daysLeft : 0
-        ]
-    ], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
