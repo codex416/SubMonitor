@@ -6,59 +6,32 @@ header('Access-Control-Allow-Origin: *');
 date_default_timezone_set('Asia/Shanghai');
 
 $logFile = '/opt/SubMonitor/rules/access.log';
-$cacheFile = '/tmp/ip_cache.json';
 
 if (!file_exists($logFile)) {
     echo json_encode([]);
     exit;
 }
 
-$ipCache = [];
-if (file_exists($cacheFile)) {
-    $ipCache = json_decode(file_get_contents($cacheFile), true) ?: [];
-}
-$cacheUpdated = false;
-
-function getIpLocation($ip, &$ipCache, &$cacheUpdated) {
-    if (!$ip || $ip === '-') return '未知';
-    if (filter_var($ip, FILTER_VALIDATE_IP, FILTER_FLAG_NO_PRIV_RANGE | FILTER_FLAG_NO_RES_RANGE) === false) {
-        return "局域网 IP";
-    }
-    if (isset($ipCache[$ip])) {
-        return $ipCache[$ip];
-    }
-    $ctx = stream_context_create([
-        'http' => ['timeout' => 1, 'header' => "User-Agent: Mozilla/5.0\r\n"]
-    ]);
-    $res = @file_get_contents("http://ip-api.com/json/{$ip}?lang=zh-CN", false, $ctx);
-    if ($res) {
-        $data = json_decode($res, true);
-        if ($data && isset($data['status']) && $data['status'] === 'success') {
-            $info = sprintf("%s %s %s %s", 
-                $data['country'] ?? '', $data['regionName'] ?? '', 
-                $data['city'] ?? '', $data['isp'] ?? '');
-            $info = trim($info) ?: '公网 IP';
-            $ipCache[$ip] = $info;
-            $cacheUpdated = true;
-            return $info;
-        }
-    }
-    return "公网 IP";
-}
-
 $fp = fopen($logFile, 'r');
-if (!$fp) { echo json_encode([]); exit; }
-$size = filesize($logFile);
-$readSize = min($size, 262144);
-$lines = [];
-if ($readSize > 0) {
-    fseek($fp, $size - $readSize);
-    $data = fread($fp, $readSize);
-    fclose($fp);
-    $lines = array_filter(explode("\n", $data));
-} else {
-    fclose($fp);
+if (!$fp) { 
+    echo json_encode([]); 
+    exit; 
 }
+
+$lines = [];
+// 【优化 1】加上文件共享锁，确保高并发写入时读取安全
+if (flock($fp, LOCK_SH)) {
+    $size = filesize($logFile);
+    $readSize = min($size, 262144);
+    if ($readSize > 0) {
+        fseek($fp, $size - $readSize);
+        $data = fread($fp, $readSize);
+        $lines = array_filter(explode("\n", $data));
+    }
+    flock($fp, LOCK_UN); // 释放锁
+}
+fclose($fp);
+
 $lines = array_reverse($lines);
 $result = [];
 $targetTimeZone = new DateTimeZone('Asia/Shanghai');
@@ -103,18 +76,14 @@ foreach ($lines as $line) {
         $result[] = [
             'time'    => $formattedTime,
             'ip'      => $ip,
-            'ip_info' => getIpLocation($ip, $ipCache, $cacheUpdated),
+            'ip_info' => '获取中...', // 【优化 2】配合前端异步请求 IP 归属地，后端直接返回默认值
             'token'   => $token,
             'status'  => $status,
             'ua'      => $ua
         ];
 
-        if (count($result) >= 100) break;
+        // 【优化 3】已删掉原先的 if (count($result) >= 100) break; 限制，解除 100 条上限
     }
-}
-
-if ($cacheUpdated) {
-    @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
 echo json_encode($result, JSON_UNESCAPED_UNICODE);
