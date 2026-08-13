@@ -9,14 +9,17 @@ mkdir -p /etc/nginx/conf.d
 mkdir -p /opt/SubMonitor/rules
 mkdir -p /etc/nginx/ssl
 
-chmod -R 777 /etc/nginx/conf.d
-chmod -R 777 /opt/SubMonitor/rules
-chmod -R 777 /etc/nginx/ssl 2>/dev/null || true
-
 touch /opt/SubMonitor/rules/ip_blacklist.conf
 touch /opt/SubMonitor/rules/ua_blacklist.conf
 touch /opt/SubMonitor/rules/token_blacklist.conf
+
+# 确保 rules 目录及所有配置文件、缓存文件的权限完全拉满，彻底解决写入失败
+chmod -R 777 /opt/SubMonitor/rules
 chmod 666 /opt/SubMonitor/rules/*.conf 2>/dev/null || true
+chmod 666 /opt/SubMonitor/rules/*.json 2>/dev/null || true
+
+chmod -R 777 /etc/nginx/conf.d
+chmod -R 777 /etc/nginx/ssl 2>/dev/null || true
 
 echo "[Init] 权限初始化完成！"
 
@@ -81,7 +84,7 @@ fi
       echo "{\"status\":\"success\",\"msg\":\"✅ $DOMAIN 证书申请成功，已自动生效！\"}" > /opt/SubMonitor/rules/cert_status.json
     else
       echo "[Cert] ❌ $DOMAIN 证书申请失败"
-      echo "{\"status\":\"error\",\"msg\":\"❌ 申请失败！请确认：域名已解析到本机IP + 80端口开放 + 无CDN\"}" > /opt/SubMonitor/rules/cert_status.json
+      echo "{\"status\":\"error","msg\":\"❌ 申请失败！请确认：域名已解析到本机IP + 80端口开放 + 无CDN\"}" > /opt/SubMonitor/rules/cert_status.json
     fi
   fi
 
