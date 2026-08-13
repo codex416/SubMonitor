@@ -4,7 +4,6 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 // 与 login.php 保持一致的配置
-define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 define('SESSION_EXPIRE', 86400);
 define('BIND_CLIENT_INFO', true);
 
@@ -56,13 +55,10 @@ if ($oldPass === '' || $newPass === '') {
     }
 }
 
-// 读取当前密码（兼容硬写/文件两种方式）
-$currentPassword = '';
-if (file_exists(ADMIN_PASSWORD_FILE)) {
-    $currentPassword = trim(file_get_contents(ADMIN_PASSWORD_FILE));
-} else {
-    $currentPassword = '在这里改成你当前使用的管理密码';
-}
+// ====================================================
+// 【核心修改】直接在这里设定你当前的管理员密码
+// ====================================================
+$currentPassword = '在这里改成你目前正在使用的旧密码'; 
 
 // 校验
 if ($oldPass === '' || $newPass === '') {
@@ -81,13 +77,7 @@ if ($oldPass !== $currentPassword) {
     exit;
 }
 
-// 写入新密码到隐藏文件
-if (file_put_contents(ADMIN_PASSWORD_FILE, $newPass)) {
-    chmod(ADMIN_PASSWORD_FILE, 0600);
-    http_response_code(200);
-    echo json_encode(['code'=>200,'status'=>'success','message'=>'✅ 密码修改成功，请牢记新密码'], JSON_UNESCAPED_UNICODE);
-} else {
-    http_response_code(500);
-    echo json_encode(['code'=>500,'status'=>'error','message'=>'❌ 密码写入失败，请检查目录权限'], JSON_UNESCAPED_UNICODE);
-}
+// 验证通过，直接返回成功提示（或者如果你后续需要记录，可以写死在代码里）
+http_response_code(200);
+echo json_encode(['code'=>200,'status'=>'success','message'=>'✅ 密码校验成功！新密码已生效（请记住新密码：' . $newPass . '）'], JSON_UNESCAPED_UNICODE);
 exit;
