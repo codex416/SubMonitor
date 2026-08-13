@@ -340,6 +340,8 @@
             display: inline-flex;
             align-items: center;
             gap: 2px;
+            margin-left: 4px;
+            vertical-align: middle;
         }
 
         .btn-ban:hover {
@@ -1559,10 +1561,8 @@
                 return '<span style="color:var(--text-muted)">-</span>';
             }
             const safeText = escapeHtml(rawText);
-            const copyIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-            return `<div class="pill-box" onclick="toggleExpand(this)" title="点击展开/折叠">
-                <span>${safeText}</span>
-                <button class="btn-copy-icon" data-copy="${safeText}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), '${label}')" title="复制 ${label}">${copyIconSvg}</button>
+            return `<div class="pill-box" onclick="toggleExpand(this)" title="点击复制内容" style="justify-content: center;">
+                <span onclick="event.stopPropagation(); copyToClipboard('${safeText}', '${label}')">${safeText}</span>
             </div>`;
         }
 
@@ -1864,18 +1864,17 @@
                             <td style="color:#334155">${escapeHtml(l.time)}</td>
                             <td>
                                 ${renderPillBox(l.ip, 'IP')}
+                                ${banIpBtn}
                                 <div id="${infoId}" class="ip-sub">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                             </td>
-                            <td>${renderPillBox(l.token, 'Token')}</td>
+                            <td>
+                                ${renderPillBox(l.token, 'Token')}
+                                ${banTokenBtn}
+                            </td>
                             <td>${getStatusBadge(l.status)}</td>
                             <td>${getRemark(l.status)}</td>
                             <td class="ua-text" title="${escapeHtml(l.ua)}">${escapeHtml(l.ua)}</td>
-                            <td>
-                                <div class="ban-actions">
-                                    ${banIpBtn}
-                                    ${banTokenBtn}
-                                </div>
-                            </td>
+                            <td></td>
                         </tr>
                     `;
                 }).join('');
