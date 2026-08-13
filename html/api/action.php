@@ -85,6 +85,25 @@ if ($action === 'update_upstream') {
 }
 
 // ========================================================
+// ✅ 1.1 获取当前反代目标域名
+// ========================================================
+if ($action === 'get_upstream') {
+    $upstream = '';
+    if (file_exists(RULES_DIR . 'upstream.conf')) {
+        $upstream = trim(file_get_contents(RULES_DIR . 'upstream.conf'));
+    } elseif (file_exists(NGINX_CONF)) {
+        $confContent = file_get_contents(NGINX_CONF);
+        if (preg_match('/set\s+\$backend_url\s+"https?:\/\/([^"]+)";/i', $confContent, $m)) {
+            $upstream = trim($m[1]);
+        } elseif (preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', $confContent, $m)) {
+            $upstream = trim($m[1]);
+        }
+    }
+    echo json_encode(['status' => 'success', 'upstream' => $upstream], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ========================================================
 // ✅ 2. 更新域名 + 申请证书
 // ========================================================
 if ($action === 'apply_cert' || $action === 'update_domain') {
