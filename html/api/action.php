@@ -15,6 +15,9 @@ $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = trim($inputData['action'] ?? $_POST['action'] ?? $_GET['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
+// ── 调试日志：记录每一次请求的动作和原始数据，方便排查 ──
+@error_log("DEBUG_REQUEST: Method=" . $_SERVER['REQUEST_METHOD'] . " | Action=" . $action . " | RAW=" . file_get_contents('php://input'));
+
 // 强制确保所有目录存在+可写
 foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP), dirname(ADMIN_PASSWORD_FILE)] as $dir) {
     if (!is_dir($dir)) @mkdir($dir, 0777, true);
@@ -63,7 +66,6 @@ if ($action === 'update_upstream') {
         }
     }
     
-    // 如果配置文件里本来没有这行，直接把整段内容写回去或者按默认处理
     $c = implode('', $newLines);
 
     safeWriteFile(RULES_DIR . 'upstream.conf', $t);
@@ -73,7 +75,6 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    // 触发 Nginx 容器重载标记
     @file_put_contents($reloadFlag, (string)time());
 
     echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新为：{$t}，配置已触发自动重载"], JSON_UNESCAPED_UNICODE);
@@ -102,7 +103,7 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 3. 获取证书状态（实时优先读取真实 cert.pem 证书文件）
+// ✅ 3. 获取证书状态
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
@@ -160,12 +161,12 @@ if ($action === 'cert_status') {
 }
 
 // ========================================================
-// ✅ 4. 更新黑名单
+// ✅ 4. 更新黑名单（兼容所有常见命名）
 // ========================================================
-if ($action === 'update_blacklist') {
-    $ipList = $inputData['ip_blacklist'] ?? [];
-    $uaList = $inputData['ua_blacklist'] ?? [];
-    $tokenList = $inputData['token_blacklist'] ?? [];
+if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'save_blacklist') {
+    $ipList = $inputData['ip_blacklist'] ?? $_POST['ip_blacklist'] ?? [];
+    $uaList = $inputData['ua_blacklist'] ?? $_POST['ua_blacklist'] ?? [];
+    $tokenList = $inputData['token_blacklist'] ?? $_POST['token_blacklist'] ?? [];
 
     $ipContent = '# 禁止访问的IP'."\n".implode("\n", array_filter(array_map('trim', $ipList)))."\n";
     $uaContent = '# 禁止访问的客户端标识'."\n".implode("\n", array_filter(array_map('trim', $uaList)))."\n";
@@ -243,4 +244,4 @@ if ($action === 'change_password') {
 }
 
 // ========================================================
-echo json_encode(['status'=>'error','message'=>'⚠️ 未知操作'], JSON_UNESCAPED_UNICODE);
+echo json_encode(['status'=>'error','message'=>"⚠️ 未知操作：[{$action}]"], JSON_UNESCAPED_UNICODE);
