@@ -74,8 +74,8 @@ foreach ($lines as $line) {
         $parsedUrl = parse_url($url);
         $path = $parsedUrl['path'] ?? $url;
 
-        // ✅ 只过滤面板自身 API 和静态文件，保留所有其他请求
-        if (strpos($url, '/api/') !== false || $path === '/' || $path === '/index.html' || $path === '/login.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff)$/i', $path)) {
+        // ✅ 已修复：放行证书和域名反代相关的 API，避免面板检测失效
+        if ((strpos($url, '/api/') !== false && strpos($url, 'cert') === false && strpos($url, 'domain') === false) || $path === '/' || $path === '/index.html' || $path === '/login.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff)$/i', $path)) {
             continue;
         }
 
@@ -100,7 +100,6 @@ foreach ($lines as $line) {
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         $formattedTime = $dt ? $dt->setTimezone($targetTimeZone)->format('Y-m-d H:i:s') : $timeRaw;
 
-        // ✅ 关键修复：没有 token 也展示，token 列显示 "-"
         $result[] = [
             'time'    => $formattedTime,
             'ip'      => $ip,
