@@ -187,6 +187,52 @@ if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'sa
 }
 
 // ========================================================
+// ✅ 4.1 处理快捷封禁动作 (来自日志页面的快捷封禁，动作名为 ban)
+// ========================================================
+if ($action === 'ban') {
+    $type = trim($inputData['type'] ?? '');
+    $value = trim($inputData['value'] ?? '');
+
+    if (empty($type) || empty($value)) {
+        echo json_encode(['status'=>'error','message'=>'封禁类型或值不能为空'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $fileMap = [
+        'ip' => RULES_DIR . 'ip_blacklist.conf',
+        'ua' => RULES_DIR . 'ua_blacklist.conf',
+        'token' => RULES_DIR . 'token_blacklist.conf'
+    ];
+
+    if (!isset($fileMap[$type])) {
+        echo json_encode(['status'=>'error','message'=>'非法的封禁类型'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $targetFile = $fileMap[$type];
+    
+    $currentContent = file_exists($targetFile) ? file_get_contents($targetFile) : '';
+    $lines = array_filter(array_map('trim', explode("\n", $currentContent)));
+    $lines = array_filter($lines, function($l) { return strpos($l, '#') !== 0; });
+
+    if (!in_array($value, $lines)) {
+        $lines[] = $value;
+    }
+
+    $newContent = '# 禁止访问的 ' . strtoupper($type) . "\n" . implode("\n", $lines) . "\n";
+    $ok = safeWriteFile($targetFile, $newContent);
+
+    @file_put_contents($reloadFlag, (string)time());
+
+    if ($ok) {
+        echo json_encode(['status'=>'success','message'=>"✅ 成功将 [{$value}] 加入 {$type} 黑名单"], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode(['status'=>'error','message'=>'⚠️ 写入黑名单文件失败'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+// ========================================================
 // ✅ 5. 读取配置
 // ========================================================
 if ($action === 'get_config') {
