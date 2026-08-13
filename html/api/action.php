@@ -5,7 +5,8 @@ require_once __DIR__ . '/auth.php';
 define('RULES_DIR',    '/etc/nginx/rules/');
 define('NGINX_CONF',   '/etc/nginx/conf.d/default.conf');
 define('SSL_DIR',      '/etc/nginx/ssl/');
-define('LOGIN_PHP',    __DIR__ . '/login.php'); // = /var/www/html/api/login.php
+define('LOGIN_PHP',    __DIR__ . '/login.php'); 
+define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 
 header('Content-Type: application/json; charset=utf-8');
 require_login();
@@ -15,7 +16,7 @@ $action = trim($inputData['action'] ?? $_POST['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
 // 强制确保所有目录存在+可写
-foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP)] as $dir) {
+foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP), dirname(ADMIN_PASSWORD_FILE)] as $dir) {
     if (!is_dir($dir)) @mkdir($dir, 0777, true);
     @chmod($dir, 0777);
 }
@@ -195,38 +196,32 @@ if ($action === 'get_config') {
 }
 
 // ========================================================
-// ✅ 修改密码 —— 路径+调试全修复，明确提示文件位置！
+// ✅ 修改密码 —— 已修复为校验原密码并写入 .admin_password
 // ========================================================
 if ($action === 'change_password') {
-    $new = trim($inputData['new_password'] ?? '');
-    if (empty($new)) {
-        echo json_encode(['status'=>'error','message'=>'新密码不能为空'], JSON_UNESCAPED_UNICODE);
+    $old = trim($inputData['old_password'] ?? $_POST['old_password'] ?? '');
+    $new = trim($inputData['new_password'] ?? $_POST['new_password'] ?? '');
+    
+    $currentPassword = file_exists(ADMIN_PASSWORD_FILE) ? trim(file_get_contents(ADMIN_PASSWORD_FILE)) : '';
+
+    if (empty($old) || empty($new)) {
+        echo json_encode(['status'=>'error','message'=>'原密码与新密码不能为空'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    if (strlen($new) < 4) {
-        echo json_encode(['status'=>'error','message'=>'新密码长度至少4位'], JSON_UNESCAPED_UNICODE);
+    if ($old !== $currentPassword) {
+        echo json_encode(['status'=>'error','message'=>'原密码校验失败'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+    if (strlen($new) < 6) {
+        echo json_encode(['status'=>'error','message'=>'新密码长度至少6位'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    // ✅ 明确显示路径，方便排查！
-    if (!file_exists(LOGIN_PHP)) {
-        echo json_encode(['status'=>'error','message'=>'❌ 找不到文件：'.LOGIN_PHP], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-    if (!is_writable(LOGIN_PHP)) {
-        echo json_encode(['status'=>'error','message'=>'❌ 文件不可写：'.LOGIN_PHP], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    $content = file_get_contents(LOGIN_PHP);
-    $newLine = "define('ADMIN_PASSWORD', '{$new}');";
-    $content = preg_replace("/define\('ADMIN_PASSWORD',[^;]+;/", $newLine, $content);
-
-    if (file_put_contents(LOGIN_PHP, $content)) {
-        @chmod(LOGIN_PHP, 0666);
+    if (file_put_contents(ADMIN_PASSWORD_FILE, $new)) {
+        @chmod(ADMIN_PASSWORD_FILE, 0600);
         echo json_encode(['status'=>'success','message'=>'✅ 密码修改成功！下次登录用新密码'], JSON_UNESCAPED_UNICODE);
     } else {
-        echo json_encode(['status'=>'error','message'=>'❌ 写入失败：权限不足'], JSON_UNESCAPED_UNICODE);
+        echo json_encode(['status'=>'error','message'=>'❌ 写入失败：请检查目录权限'], JSON_UNESCAPED_UNICODE);
     }
     exit;
 }
