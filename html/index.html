@@ -974,6 +974,29 @@
     <div id="toast" class="toast">已复制到剪贴板</div>
 
     <script>
+        // 异步获取 IP 归属地缓存及核心方法
+        const ipGeoCache = {};
+        async function fetchAsyncIpGeo(ip, element) {
+            if (!ip || ip === '-' || element.dataset.fetched) return;
+            if (ipGeoCache[ip]) {
+                element.innerText = ipGeoCache[ip];
+                element.dataset.fetched = "true";
+                return;
+            }
+            try {
+                const res = await fetch(`https://ipapi.co/${ip}/json/`);
+                const data = await res.json();
+                const info = [data.country_name, data.region, data.city].filter(Boolean).join(' ') || data.country || '';
+                if (info) {
+                    ipGeoCache[ip] = info;
+                    element.innerText = info;
+                    element.dataset.fetched = "true";
+                }
+            } catch (e) {
+                // 保持静默失败或默认展示
+            }
+        }
+
         (async function checkAuthOnLoad() {
             try {
                 const res = await fetch('/api/check_status.php');
@@ -1624,7 +1647,15 @@
                 .map(ip => ({ ip, ...ipStats[ip] }))
                 .sort((a, b) => b.count - a.count);
 
-            renderCardList('list-top-ip', topIpList, item => `
+            renderCardList('list-top-ip', topIpList, item => {
+                const infoId = 'geo-top-ip-' + Math.random().toString(36).substring(2, 9);
+                if (!item.info && item.ip && item.ip !== '-') {
+                    setTimeout(() => {
+                        const el = document.getElementById(infoId);
+                        if (el) fetchAsyncIpGeo(item.ip, el);
+                    }, 50);
+                }
+                return `
                 <div class="item-left">
                     <span class="rank-num">${item.rank}</span>
                     <div class="item-main">
@@ -1632,14 +1663,15 @@
                             <span class="item-title">${escapeHtml(item.ip)}</span>
                             ${renderCopyBtn(item.ip, 'IP')}
                         </div>
-                        <span class="item-sub">${escapeHtml(item.info || '')}</span>
+                        <span id="${infoId}" class="item-sub">${escapeHtml(item.info || (item.ip !== '-' ? '获取中...' : ''))}</span>
                     </div>
                 </div>
                 <div class="item-right">
                     <span class="count-badge">${item.count}次</span>
                     <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
                 </div>
-            `);
+            `;
+            });
 
             const tokenStats = {};
             todayLogs.forEach(l => {
@@ -1710,7 +1742,15 @@
                 .map(ip => ({ ip, tokenCount: ipTokenMap[ip].tokens.size, info: ipTokenMap[ip].info }))
                 .sort((a, b) => b.tokenCount - a.tokenCount);
 
-            renderCardList('list-sus-ip', susIpList, item => `
+            renderCardList('list-sus-ip', susIpList, item => {
+                const infoId = 'geo-sus-ip-' + Math.random().toString(36).substring(2, 9);
+                if (!item.info && item.ip && item.ip !== '-') {
+                    setTimeout(() => {
+                        const el = document.getElementById(infoId);
+                        if (el) fetchAsyncIpGeo(item.ip, el);
+                    }, 50);
+                }
+                return `
                 <div class="item-left">
                     <span class="rank-num">${item.rank}</span>
                     <div class="item-main">
@@ -1718,14 +1758,15 @@
                             <span class="item-title">${escapeHtml(item.ip)}</span>
                             ${renderCopyBtn(item.ip, 'IP')}
                         </div>
-                        <span class="item-sub">${escapeHtml(item.info || '')}</span>
+                        <span id="${infoId}" class="item-sub">${escapeHtml(item.info || (item.ip !== '-' ? '获取中...' : ''))}</span>
                     </div>
                 </div>
                 <div class="item-right">
                     <span class="count-badge" style="color:var(--primary-red)">${item.tokenCount} 个Token</span>
                     <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
                 </div>
-            `);
+            `;
+            });
         }
 
         function renderCardList(containerId, list, templateFn) {
@@ -1760,6 +1801,14 @@
                     const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
                     const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
 
+                    const infoId = 'm-geo-' + Math.random().toString(36).substring(2, 9);
+                    if (!l.ip_info && l.ip && l.ip !== '-') {
+                        setTimeout(() => {
+                            const el = document.getElementById(infoId);
+                            if (el) fetchAsyncIpGeo(l.ip, el);
+                        }, 50);
+                    }
+
                     return `
                         <tr class="m-card">
                             <td>
@@ -1775,7 +1824,7 @@
                                         <div class="m-label">IP</div>
                                         <div class="m-value">
                                             ${renderPillBox(l.ip, 'IP')}
-                                            <div class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || '')}</div>
+                                            <div id="${infoId}" class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                                         </div>
                                     </div>
                                     <div class="m-row">
@@ -1802,12 +1851,20 @@
                     const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
                     const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
 
+                    const infoId = 'pc-geo-' + Math.random().toString(36).substring(2, 9);
+                    if (!l.ip_info && l.ip && l.ip !== '-') {
+                        setTimeout(() => {
+                            const el = document.getElementById(infoId);
+                            if (el) fetchAsyncIpGeo(l.ip, el);
+                        }, 50);
+                    }
+
                     return `
                         <tr>
                             <td style="color:#334155">${escapeHtml(l.time)}</td>
                             <td>
                                 ${renderPillBox(l.ip, 'IP')}
-                                <div class="ip-sub">${escapeHtml(l.ip_info || '')}</div>
+                                <div id="${infoId}" class="ip-sub">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                             </td>
                             <td>${renderPillBox(l.token, 'Token')}</td>
                             <td>${getStatusBadge(l.status)}</td>
