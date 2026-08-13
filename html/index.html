@@ -6,7 +6,7 @@
     <meta name="theme-color" content="#f8fafc">
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
-    <meta http-expires="0">
+    <meta http-equiv="Expires" content="0">
     <title>SubMonitor - 订阅监控</title>
     
     <style>
@@ -65,7 +65,6 @@
             letter-spacing: -0.3px;
         }
 
-        /* 退出按钮样式 */
         .logout-btn {
             background: #fef2f2;
             color: var(--primary-red);
@@ -850,25 +849,21 @@
                 </div>
             </div>
 
-            <!-- 反代目标域名（机场域名）修改组件 -->
             <div class="control-row">
                 <input type="text" id="upstream-input" class="search-input" placeholder="输入反代目标域名 (例如: airport.example.com)">
                 <button class="btn" style="background:#0284c7; color:#ffffff; border:none; font-weight:600;" onclick="submitUpstreamDomain()">更新反代目标域名</button>
             </div>
 
-            <!-- 域名修改与证书申请组件 -->
             <div class="control-row">
                 <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
                 <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
             </div>
 
-            <!-- 【新增】修改管理员密码组件 -->
             <div class="control-row">
                 <input type="password" id="new-password-input" class="search-input" placeholder="输入新的管理员密码">
                 <button class="btn" style="background:var(--primary-green); color:#ffffff; border:none; font-weight:600;" onclick="submitChangePassword()">修改管理员密码</button>
             </div>
 
-            <!-- 宝塔式 SSL 证书状态面板 -->
             <div id="cert-status-box" style="display:block; width:100%; font-size:0.78rem; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-family:monospace; word-break:break-all;">
                 <div style="display:flex; justify-content:space-between; align-items:center;">
                     <span>🔒 SSL证书状态：<span id="cert-status-text" style="color:var(--text-muted)">正在获取证书状态...</span></span>
@@ -978,22 +973,20 @@
     <div id="toast" class="toast">已复制到剪贴板</div>
 
     <script>
-        // 【新增】页面加载时优先鉴权：未登录直接拦截回 login.html
         (async function checkAuthOnLoad() {
             try {
                 const res = await fetch('/api/check_status.php');
                 const data = await res.json();
-                if (data.code !== 200) {
+                if (data.code !== 200 && data.status !== 'success') {
                     window.location.href = '/login.html';
                 } else {
-                    initializeApp(); // 鉴权成功后启动原面板逻辑
+                    initializeApp();
                 }
             } catch (e) {
                 window.location.href = '/login.html';
             }
         })();
 
-        // 【新增】退出登录逻辑
         function handleLogout() {
             if(!confirm('确定要退出当前管理面板吗？')) return;
             fetch('/api/login.php', {
@@ -1015,18 +1008,16 @@
 
         function padZero(n) { return n.toString().padStart(2, '0'); }
 
-        // 获取并填充反代目标域名（机场域名）
         async function fetchUpstreamDomain() {
             try {
                 const res = await fetch('/api/action.php?action=get_upstream');
                 const data = await res.json();
-                if (data.status === 'success' && data.upstream) {
+                if ((data.status === 'success' || data.code === 200) && data.upstream) {
                     document.getElementById('upstream-input').value = data.upstream;
                 }
             } catch (e) {}
         }
 
-        // 提交修改反代目标域名
         async function submitUpstreamDomain() {
             const input = document.getElementById('upstream-input');
             const target = input.value.trim();
@@ -1043,8 +1034,8 @@
                     body: JSON.stringify({ action: 'update_upstream', target_domain: target })
                 });
                 const data = await res.json();
-                if (data.status === 'success') {
-                    showToast('✅ ' + data.message);
+                if (data.status === 'success' || data.code === 200) {
+                    showToast('✅ ' + (data.message || '更新成功'));
                     fetchUpstreamDomain();
                 } else {
                     showToast('❌ ' + (data.message || '更新失败'));
@@ -1054,7 +1045,6 @@
             }
         }
 
-        // 【已修改】提交修改管理员密码（包含旧密码收集校验）
         async function submitChangePassword() {
             const input = document.getElementById('new-password-input');
             const newPassword = input.value.trim();
@@ -1081,10 +1071,10 @@
                 });
                 const data = await res.json();
                 showToast(data.message || '操作完成');
-                if (data.code === 200) {
+                if (data.code === 200 || data.status === 'success') {
                     input.value = '';
                     setTimeout(() => {
-                        window.location.href = 'login.html'; // 修改成功后跳转回登录页
+                        window.location.href = 'login.html';
                     }, 1500);
                 }
             } catch (err) {
@@ -1092,7 +1082,6 @@
             }
         }
 
-        // 查询宝塔式 SSL 证书状态
         async function checkCertStatus() {
             const statusText = document.getElementById('cert-status-text');
             const detailBox = document.getElementById('cert-detail-info');
@@ -1102,7 +1091,7 @@
                 const res = await fetch('/api/action.php?action=cert_status');
                 const data = await res.json();
                 
-                if (data.status === 'success' && data.cert) {
+                if ((data.status === 'success' || data.code === 200) && data.cert) {
                     const cert = data.cert;
                     let statusColor = 'var(--primary-green)';
                     let statusBadge = '🟢 证书生效中';
@@ -1154,7 +1143,7 @@
                     body: JSON.stringify({ action: 'apply_cert', domain: domain })
                 });
                 const data = await res.json();
-                if (data.status === 'success') {
+                if (data.status === 'success' || data.code === 200) {
                     showToast('✅ SSL 证书申请成功！');
                     checkCertStatus();
                 } else {
@@ -1374,7 +1363,7 @@
             })
             .then(res => res.json())
             .then(data => {
-                if (data.status === 'success') {
+                if (data.status === 'success' || data.code === 200) {
                     showToast(`已成功封禁 ${typeLabel}: ${value}`);
                     fetchData();
                     if (document.getElementById('blacklist-modal').classList.contains('active')) {
@@ -1400,7 +1389,7 @@
             try {
                 const res = await fetch('/api/action.php?action=list');
                 const ret = await res.json();
-                if (ret.status === 'success') {
+                if (ret.status === 'success' || ret.code === 200) {
                     currentBlData = ret.data || { ip: [], token: [], ua: [] };
                     document.getElementById('bl-count-ip').innerText = (currentBlData.ip || []).length;
                     document.getElementById('bl-count-token').innerText = (currentBlData.token || []).length;
@@ -1408,7 +1397,7 @@
                     renderBlacklistTab();
                 }
             } catch (e) {
-                showToast('获取黑名单列表失败', false);
+                showToast('获取黑名单列表失败');
             }
         }
 
@@ -1454,7 +1443,7 @@
                 });
                 const data = await res.json();
                 showToast(data.message || '操作成功');
-                if (data.status === 'success') {
+                if (data.status === 'success' || data.code === 200) {
                     document.getElementById('bl-input-value').value = '';
                     fetchBlacklistRules();
                     fetchData();
@@ -1474,7 +1463,7 @@
                 });
                 const data = await res.json();
                 showToast(data.message || '操作成功');
-                if (data.status === 'success') {
+                if (data.status === 'success' || data.code === 200) {
                     fetchBlacklistRules();
                     fetchData();
                 }
