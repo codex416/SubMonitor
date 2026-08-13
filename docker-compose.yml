@@ -5,9 +5,9 @@ services:
     user: root
     restart: always
     volumes:
-      - ./html:/var/www/html
+      - ./html:/opt/SubMonitor/html
       - ./nginx:/etc/nginx/conf.d
-      - ./rules:/etc/nginx/rules
+      - ./rules:/opt/SubMonitor/rules
       - ./ssl:/etc/nginx/ssl
       - log-data:/var/log/nginx
 
@@ -19,9 +19,9 @@ services:
       - "80:80"
       - "443:443"
     volumes:
-      - ./html:/var/www/html
+      - ./html:/opt/SubMonitor/html
       - ./nginx:/etc/nginx/conf.d
-      - ./rules:/etc/nginx/rules
+      - ./rules:/opt/SubMonitor/rules
       - ./ssl:/etc/nginx/ssl
       - ./entrypoint.sh:/entrypoint.sh
       - log-data:/var/log/nginx
@@ -29,7 +29,7 @@ services:
       - php
     entrypoint: [
       "sh", "-c",
-      "chmod +x /entrypoint.sh && chmod -R 777 /var/www/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
+      "chmod +x /entrypoint.sh && chmod -R 777 /opt/SubMonitor/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
     ]
 
 volumes:
