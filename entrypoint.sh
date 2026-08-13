@@ -38,7 +38,8 @@ fi
 if [ ! -f /root/.acme.sh/acme.sh ]; then
   echo "[Init] 正在安装 acme.sh..."
   curl -s https://get.acme.sh | sh -s email=admin@befriends.wiki >/dev/null 2>&1
-  /root/.acme.sh/acme.sh --set-default-ca --server zerossl >/dev/null 2>&1
+  # 已更改为 Let's Encrypt
+  /root/.acme.sh/acme.sh --set-default-ca --server letsencrypt >/dev/null 2>&1
   echo "[Init] acme.sh 安装完成"
 fi
 
