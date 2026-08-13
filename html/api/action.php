@@ -34,7 +34,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// ✅ 更新反代域名（直接写文件，利用 Nginx 变量动态生效，无需 reload）
+// ✅ 1. 更新反代目标域名（使用超级宽松的正则兼容任意缩进和引号）
 // ========================================================
 if ($action === 'update_upstream') {
     $t = trim($inputData['target_domain'] ?? $_POST['target_domain'] ?? '');
@@ -51,9 +51,10 @@ if ($action === 'update_upstream') {
     }
 
     $c = file_get_contents(NGINX_CONF);
-    $c = preg_replace('/set\s+\$backend_url\s+"https?:\/\/[^"]+";/i', "set \$backend_url \"https://{$t}\";", $c);
-    $c = preg_replace('/proxy_pass\s+https?:\/\/[^\/;\s]+;/i', "proxy_pass https://{$t};", $c);
-    $c = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/i', "proxy_set_header Host {$t};", $c);
+    
+    // 宽松正则匹配替换后端变量
+    $c = preg_replace('/\s*set\s+\$backend_url\s+"https?:\/\/[^"]*";/i', "\n        set \$backend_url \"https://{$t}\";", $c);
+    $c = preg_replace('/\s*proxy_pass\s+\$backend_url;/i', "\n        proxy_pass \$backend_url;", $c);
 
     safeWriteFile(RULES_DIR . 'upstream.conf', $t);
 
@@ -62,12 +63,15 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新：{$t}，配置已实时生效"], JSON_UNESCAPED_UNICODE);
+    // 触发 Nginx 容器重载标记
+    @file_put_contents($reloadFlag, (string)time());
+
+    echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新为：{$t}，配置已触发自动重载"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // ========================================================
-// ✅ 更新域名 + 申请证书
+// ✅ 2. 更新域名 + 申请证书
 // ========================================================
 if ($action === 'apply_cert' || $action === 'update_domain') {
     $d = trim($inputData['domain'] ?? $_POST['domain'] ?? '');
@@ -88,7 +92,7 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态（实时读取 cert.pem）
+// ✅ 3. 获取证书状态（实时优先读取真实 cert.pem 证书文件）
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
@@ -146,7 +150,7 @@ if ($action === 'cert_status') {
 }
 
 // ========================================================
-// ✅ 更新黑名单
+// ✅ 4. 更新黑名单
 // ========================================================
 if ($action === 'update_blacklist') {
     $ipList = $inputData['ip_blacklist'] ?? [];
@@ -161,6 +165,8 @@ if ($action === 'update_blacklist') {
     $ok2 = safeWriteFile(RULES_DIR.'ua_blacklist.conf', $uaContent);
     $ok3 = safeWriteFile(RULES_DIR.'token_blacklist.conf', $tokenContent);
 
+    @file_put_contents($reloadFlag, (string)time());
+
     if ($ok1 && $ok2 && $ok3) {
         echo json_encode(['status'=>'success','message'=>'✅ 黑名单已更新，配置已生效'], JSON_UNESCAPED_UNICODE);
     } else {
@@ -170,7 +176,7 @@ if ($action === 'update_blacklist') {
 }
 
 // ========================================================
-// ✅ 读取配置
+// ✅ 5. 读取配置
 // ========================================================
 if ($action === 'get_config') {
     $domain = '';
@@ -196,7 +202,7 @@ if ($action === 'get_config') {
 }
 
 // ========================================================
-// ✅ 修改密码
+// ✅ 6. 修改密码
 // ========================================================
 if ($action === 'change_password') {
     $old = trim($inputData['old_password'] ?? $_POST['old_password'] ?? '');
