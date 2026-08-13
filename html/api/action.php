@@ -71,6 +71,8 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
         echo json_encode(['status'=>'error','message'=>'域名不能为空'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    // 同时写入标记和 domain.conf 配置文件
+    safeWriteFile(RULES_DIR.'domain.conf', $d);
     if (!safeWriteFile(RULES_DIR.'.cert_flag', "{$d}\n")) {
         echo json_encode(['status'=>'error','message'=>'写入证书申请标记失败'], JSON_UNESCAPED_UNICODE);
         exit;
@@ -83,12 +85,11 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态（优先真实解析 cert.pem，彻底解决卡在 processing 的问题）
+// ✅ 获取证书状态（强制从真实证书中提取最新域名与信息）
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
     
-    // 1. 优先检查真实证书文件是否存在
     if (file_exists($certPath)) {
         $pem = @file_get_contents($certPath);
         if ($pem && preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
@@ -102,14 +103,13 @@ if ($action === 'cert_status') {
                 
                 $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
                 
-                // 尝试从 domain.conf 或证书 subject 中获取域名
-                $domain = 'sub.befriends.wiki';
-                if (file_exists(RULES_DIR.'domain.conf')) {
-                    $d = trim(file_get_contents(RULES_DIR.'domain.conf'));
-                    if (!empty($d)) $domain = $d;
+                // 优先从证书本身读取真实绑定域名，其次读取 domain.conf
+                $domain = $certData['subject']['CN'] ?? '';
+                if (empty($domain) && file_exists(RULES_DIR.'domain.conf')) {
+                    $domain = trim(file_get_contents(RULES_DIR.'domain.conf'));
                 }
-                if (empty($domain) && isset($certData['subject']['CN'])) {
-                    $domain = $certData['subject']['CN'];
+                if (empty($domain)) {
+                    $domain = 'sub.befriends.wiki';
                 }
 
                 echo json_encode([
@@ -126,7 +126,6 @@ if ($action === 'cert_status') {
         }
     }
 
-    // 2. 如果没有真实证书，再读取 cert_status.json 提示信息
     $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
     if ($certJson) {
         $certData = json_decode($certJson, true);
