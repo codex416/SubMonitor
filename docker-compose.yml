@@ -29,7 +29,7 @@ services:
       - php
     entrypoint: [
       "sh", "-c",
-      "chmod +x /entrypoint.sh && chmod -R 777 /opt/SubMonitor/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
+      "chmod +x /entrypoint.sh && chmod -R 777 /opt/SubMonitor/html /etc/nginx/conf.d /opt/SubMonitor/rules /etc/nginx/ssl && /entrypoint.sh"
     ]
 
 volumes:
