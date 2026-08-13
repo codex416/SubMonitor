@@ -119,7 +119,13 @@ if ($action === 'cert_status') {
                 $valid_to = date('Y-m-d H:i:s', $validToTime);
                 $daysLeft = ceil(($validToTime - time()) / 86400);
                 
-                $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
+                // 🛠️ 修复点：对颁发机构进行名称映射，将 YR1 规范显示为 Let's Encrypt
+                $rawIssuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
+                if (strpos($rawIssuer, 'YR') !== false || strpos($rawIssuer, 'Let\'s Encrypt') !== false) {
+                    $issuer = 'Let\'s Encrypt';
+                } else {
+                    $issuer = $rawIssuer;
+                }
                 
                 $domain = $certData['subject']['CN'] ?? '';
                 if (empty($domain) && file_exists(RULES_DIR.'domain.conf')) {
