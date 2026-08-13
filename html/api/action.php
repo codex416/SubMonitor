@@ -12,7 +12,8 @@ header('Content-Type: application/json; charset=utf-8');
 require_login();
 
 $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
-$action = trim($inputData['action'] ?? $_POST['action'] ?? '');
+// 【修复点】：在这里加上 $_GET['action'] 的支持
+$action = trim($inputData['action'] ?? $_POST['action'] ?? $_GET['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
 // 强制确保所有目录存在+可写
@@ -83,9 +84,18 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态（完美兼容动态解析与强制刷新）
+// ✅ 获取证书状态
 // ========================================================
 if ($action === 'cert_status') {
+    $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
+    if ($certJson) {
+        $certData = json_decode($certJson, true);
+        if ($certData && ($certData['status']==='success' || isset($certData['cert']))) {
+            echo json_encode(['status'=>'success','cert'=>$certData['cert']??null,'msg'=>$certData['msg']??''], JSON_UNESCAPED_UNICODE);
+            exit;
+        }
+    }
+
     $certPath = SSL_DIR.'cert.pem';
     if (!file_exists($certPath)) {
         echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
