@@ -10,6 +10,8 @@ services:
       - ./rules:/opt/SubMonitor/rules
       - ./ssl:/etc/nginx/ssl
       - log-data:/var/log/nginx
+    networks:
+      - submonitor-net
 
   nginx:
     image: nginx:alpine
@@ -27,6 +29,8 @@ services:
       - log-data:/var/log/nginx
     depends_on:
       - php
+    networks:
+      - submonitor-net
     entrypoint: [
       "sh", "-c",
       "chmod +x /entrypoint.sh && chmod -R 777 /opt/SubMonitor/html /etc/nginx/conf.d /opt/SubMonitor/rules /etc/nginx/ssl && /entrypoint.sh"
@@ -34,3 +38,12 @@ services:
 
 volumes:
   log-data:
+
+networks:
+  submonitor-net:
+    driver: bridge
+    enable_ipv6: true
+    ipam:
+      config:
+        - subnet: 172.18.0.0/16
+        - subnet: 2001:db8:1::/64
