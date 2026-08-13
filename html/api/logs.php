@@ -5,7 +5,7 @@ header('Access-Control-Allow-Origin: *');
 
 date_default_timezone_set('Asia/Shanghai');
 
-$logFile = '/etc/nginx/rules/access.log';
+$logFile = '/opt/SubMonitor/rules/access.log';
 $cacheFile = '/tmp/ip_cache.json';
 
 if (!file_exists($logFile)) {
