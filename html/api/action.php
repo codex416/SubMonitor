@@ -279,6 +279,82 @@ if ($action === 'ban') {
 }
 
 // ========================================================
+// ✅ 4.1.2 处理快捷解封动作 (动作名为 unban 或 remove_blacklist)
+// ========================================================
+if ($action === 'unban' || $action === 'remove_blacklist') {
+    $type = trim($inputData['type'] ?? '');
+    $value = trim($inputData['value'] ?? '');
+
+    if (empty($type) || empty($value)) {
+        echo json_encode(['status'=>'error','message'=>'解封类型或值不能为空'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $fileMap = [
+        'ip' => RULES_DIR . 'ip_blacklist.conf',
+        'ua' => RULES_DIR . 'ua_blacklist.conf',
+        'token' => RULES_DIR . 'token_blacklist.conf'
+    ];
+
+    if (!isset($fileMap[$type])) {
+        echo json_encode(['status'=>'error','message'=>'非法的解封类型'], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $targetFile = $fileMap[$type];
+    if (!file_exists($targetFile)) {
+        echo json_encode(['status'=>'success','message'=>"✅ 该黑名单文件为空"], JSON_UNESCAPED_UNICODE);
+        exit;
+    }
+
+    $currentContent = file_get_contents($targetFile);
+    $lines = explode("\n", $currentContent);
+    $newLines = [];
+
+    foreach ($lines as $line) {
+        $trimmed = trim($line);
+        if (empty($trimmed) || strpos($trimmed, '#') === 0) {
+            $newLines[] = $line;
+            continue;
+        }
+
+        $matchFound = false;
+        if ($type === 'ip') {
+            $cleanVal = str_ireplace(['deny ', ';'], '', $value);
+            if ($trimmed === "deny {$cleanVal};" || strpos($trimmed, $cleanVal) !== false) {
+                $matchFound = true;
+            }
+        } elseif ($type === 'ua') {
+            $cleanVal = addslashes($value);
+            if ($trimmed === "if (\$http_user_agent ~* \"{$cleanVal}\") { return 403; }" || strpos($trimmed, $cleanVal) !== false) {
+                $matchFound = true;
+            }
+        } elseif ($type === 'token') {
+            $cleanVal = addslashes($value);
+            if ($trimmed === "if (\$arg_token = \"{$cleanVal}\") { return 403; }" || strpos($trimmed, $cleanVal) !== false) {
+                $matchFound = true;
+            }
+        }
+
+        if (!$matchFound) {
+            $newLines[] = $line;
+        }
+    }
+
+    $newContent = implode("\n", $newLines);
+    $ok = safeWriteFile($targetFile, $newContent);
+
+    @file_put_contents($reloadFlag, (string)time());
+
+    if ($ok) {
+        echo json_encode(['status'=>'success','message'=>"✅ 成功将 [{$value}] 从 {$type} 黑名单中解封"], JSON_UNESCAPED_UNICODE);
+    } else {
+        echo json_encode(['status'=>'error','message'=>'⚠️ 写入黑名单文件失败'], JSON_UNESCAPED_UNICODE);
+    }
+    exit;
+}
+
+// ========================================================
 // ✅ 4.2 补丁：获取黑名单完整列表 (对应前端 fetchBlacklistRules)
 // ========================================================
 if ($action === 'list') {
