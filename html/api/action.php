@@ -1,30 +1,28 @@
 <?php
 require_once __DIR__ . '/auth.php';
 
-// 统一用容器内标准路径，确保100%能找到文件！[cite: 8]
+// 统一用容器内标准路径，确保100%能找到文件！
 define('RULES_DIR',    '/opt/SubMonitor/rules/');
 define('NGINX_CONF',   '/etc/nginx/conf.d/default.conf');
 define('SSL_DIR',      '/etc/nginx/ssl/');
 define('LOGIN_PHP',    __DIR__ . '/login.php'); 
 define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
-// 定义管理员路径存储文件
-define('ADMIN_PATH_FILE', __DIR__ . '/../.admin_path');
 
 header('Content-Type: application/json; charset=utf-8');
 require_login();
 
-// 强制设置时区为北京时间 (UTC+8)，确保获取到的证书到期时间准确[cite: 8]
+// 强制设置时区为北京时间 (UTC+8)，确保获取到的证书到期时间准确
 date_default_timezone_set('Asia/Shanghai');
 
 $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = trim($inputData['action'] ?? $_POST['action'] ?? $_GET['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
 
-// ── 调试日志：记录每一次请求的动作和原始数据，方便排查 ──[cite: 8]
+// ── 调试日志：记录每一次请求的动作和原始数据，方便排查 ──
 @error_log("DEBUG_REQUEST: Method=" . $_SERVER['REQUEST_METHOD'] . " | Action=" . $action . " | RAW=" . file_get_contents('php://input'));
 
-// 强制确保所有目录存在+可写[cite: 8]
-foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP), dirname(ADMIN_PASSWORD_FILE), dirname(ADMIN_PATH_FILE)] as $dir) {
+// 强制确保所有目录存在+可写
+foreach ([RULES_DIR, SSL_DIR, dirname(NGINX_CONF), dirname(LOGIN_PHP), dirname(ADMIN_PASSWORD_FILE)] as $dir) {
     if (!is_dir($dir)) @mkdir($dir, 0777, true);
     @chmod($dir, 0777);
 }
@@ -42,7 +40,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// ✅ 1. 更新反代目标域名（使用按行精准定位替换，100%生效）[cite: 8]
+// ✅ 1. 更新反代目标域名（使用按行精准定位替换，100%生效）
 // ========================================================
 if ($action === 'update_upstream') {
     $t = trim($inputData['target_domain'] ?? $_POST['target_domain'] ?? '');
@@ -58,7 +56,7 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    // 逐行读取并精准替换 backend_url 这一行[cite: 8]
+    // 逐行读取并精准替换 backend_url 这一行
     $lines = file(NGINX_CONF);
     $newLines = [];
     $updated = false;
@@ -87,7 +85,7 @@ if ($action === 'update_upstream') {
 }
 
 // ========================================================
-// ✅ 1.1 获取当前反代目标域名[cite: 8]
+// ✅ 1.1 获取当前反代目标域名
 // ========================================================
 if ($action === 'get_upstream') {
     $upstream = '';
@@ -106,7 +104,7 @@ if ($action === 'get_upstream') {
 }
 
 // ========================================================
-// ✅ 2. 更新域名 + 申请证书[cite: 8]
+// ✅ 2. 更新域名 + 申请证书
 // ========================================================
 if ($action === 'apply_cert' || $action === 'update_domain') {
     $d = trim($inputData['domain'] ?? $_POST['domain'] ?? '');
@@ -127,7 +125,7 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 3. 获取证书状态[cite: 8]
+// ✅ 3. 获取证书状态
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
@@ -143,7 +141,7 @@ if ($action === 'cert_status') {
                 $valid_to = date('Y-m-d H:i:s', $validToTime);
                 $daysLeft = ceil(($validToTime - time()) / 86400);
                 
-                // 🛠️ 修复点：对颁发机构进行名称映射，将 YR1 规范显示为 Let's Encrypt[cite: 8]
+                // 🛠️ 修复点：对颁发机构进行名称映射，将 YR1 规范显示为 Let's Encrypt
                 $rawIssuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
                 if (strpos($rawIssuer, 'YR') !== false || strpos($rawIssuer, 'Let\'s Encrypt') !== false) {
                     $issuer = 'Let\'s Encrypt';
@@ -191,7 +189,7 @@ if ($action === 'cert_status') {
 }
 
 // ========================================================
-// ✅ 4. 更新黑名单（兼容所有常见命名，并格式化为标准 Nginx 语法）[cite: 8]
+// ✅ 4. 更新黑名单（兼容所有常见命名，并格式化为标准 Nginx 语法）
 // ========================================================
 if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'save_blacklist') {
     $ipList = $inputData['ip_blacklist'] ?? $_POST['ip_blacklist'] ?? [];
@@ -243,7 +241,7 @@ if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'sa
 }
 
 // ========================================================
-// ✅ 4.1 处理快捷封禁动作 (来自日志页面的快捷封禁，动作名为 ban)[cite: 8]
+// ✅ 4.1 处理快捷封禁动作 (来自日志页面的快捷封禁，动作名为 ban)
 // ========================================================
 if ($action === 'ban') {
     $type = trim($inputData['type'] ?? '');
@@ -309,7 +307,7 @@ if ($action === 'ban') {
 }
 
 // ========================================================
-// ✅ 4.1.2 处理快捷解封动作 (动作名为 unban 或 remove_blacklist)[cite: 8]
+// ✅ 4.1.2 处理快捷解封动作 (动作名为 unban 或 remove_blacklist)
 // ========================================================
 if ($action === 'unban' || $action === 'remove_blacklist') {
     $type = trim($inputData['type'] ?? '');
@@ -385,7 +383,7 @@ if ($action === 'unban' || $action === 'remove_blacklist') {
 }
 
 // ========================================================
-// ✅ 4.2 补丁：获取黑名单完整列表 (对应前端 fetchBlacklistRules)[cite: 8]
+// ✅ 4.2 补丁：获取黑名单完整列表 (对应前端 fetchBlacklistRules)
 // ========================================================
 if ($action === 'list') {
     $parseIpList = function($filePath) {
@@ -433,7 +431,7 @@ if ($action === 'list') {
 }
 
 // ========================================================
-// ✅ 5. 读取配置[cite: 8]
+// ✅ 5. 读取配置
 // ========================================================
 if ($action === 'get_config') {
     $domain = '';
@@ -478,14 +476,10 @@ if ($action === 'get_config') {
         return array_filter($res);
     };
 
-    // 读取当前配置的管理员路径（默认 /abd12we）
-    $adminPath = file_exists(ADMIN_PATH_FILE) ? trim(file_get_contents(ADMIN_PATH_FILE)) : '/abd12we';
-
     echo json_encode([
         'status'=>'success',
         'config'=>[
             'target_domain'=>$domain,
-            'admin_path'=>$adminPath,
             'ip_blacklist'=>$parseIpList(RULES_DIR.'ip_blacklist.conf'),
             'ua_blacklist'=>$parseUaTokenList(RULES_DIR.'ua_blacklist.conf'),
             'token_blacklist'=>$parseUaTokenList(RULES_DIR.'token_blacklist.conf'),
@@ -495,7 +489,7 @@ if ($action === 'get_config') {
 }
 
 // ========================================================
-// ✅ 6. 修改密码[cite: 8]
+// ✅ 6. 修改密码
 // ========================================================
 if ($action === 'change_password') {
     $old = trim($inputData['old_password'] ?? $_POST['old_password'] ?? '');
@@ -519,38 +513,6 @@ if ($action === 'change_password') {
     if (file_put_contents(ADMIN_PASSWORD_FILE, $new)) {
         @chmod(ADMIN_PASSWORD_FILE, 0600);
         echo json_encode(['status'=>'success','message'=>'✅ 密码修改成功！下次登录用新密码'], JSON_UNESCAPED_UNICODE);
-    } else {
-        echo json_encode(['status'=>'error','message'=>'❌ 写入失败：请检查目录权限'], JSON_UNESCAPED_UNICODE);
-    }
-    exit;
-}
-
-// ========================================================
-// ✅ 7. 修改管理员路径
-// ========================================================
-if ($action === 'change_admin_path') {
-    $newPath = trim($inputData['admin_path'] ?? $_POST['admin_path'] ?? '');
-    
-    if (empty($newPath)) {
-        echo json_encode(['status'=>'error','message'=>'路径不能为空'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    // 格式化路径，确保以 / 开头，且没有尾随斜杠
-    if ($newPath[0] !== '/') {
-        $newPath = '/' . $newPath;
-    }
-    $newPath = rtrim($newPath, '/');
-
-    // 基础安全和合法性校验（只允许字母、数字、下划线、中划线及斜杠）
-    if (!preg_match('/^\/[a-zA-Z0-9_\-\/]+$/', $newPath)) {
-        echo json_encode(['status'=>'error','message'=>'路径格式不合法，仅支持字母、数字、下划线和中划线'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
-    if (safeWriteFile(ADMIN_PATH_FILE, $newPath)) {
-        @chmod(ADMIN_PATH_FILE, 0600);
-        echo json_encode(['status'=>'success','message'=>"✅ 管理路径修改成功！新路径为：{$newPath}"], JSON_UNESCAPED_UNICODE);
     } else {
         echo json_encode(['status'=>'error','message'=>'❌ 写入失败：请检查目录权限'], JSON_UNESCAPED_UNICODE);
     }
