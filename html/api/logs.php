@@ -36,6 +36,39 @@ $lines = array_reverse($lines);
 $result = [];
 $targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
+// 【新增】加载本地 IP 缓存，避免每次实时请求第三方 API 造成卡顿
+$cacheFile = '/opt/SubMonitor/rules/ip_cache.json';
+$ipCache = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
+$cacheChanged = false;
+
+function getIpInfoFast($ip, &$ipCache, &$cacheChanged) {
+    // 局域网或本地回环直接返回
+    if ($ip === '127.0.0.1' || $ip === '::1' || strpos($ip, '192.168.') === 0 || strpos($ip, '10.') === 0 || strpos($ip, '172.') === 0) {
+        return '本地/局域网';
+    }
+    // 命中缓存直接返回
+    if (isset($ipCache[$ip])) {
+        return $ipCache[$ip];
+    }
+    
+    // 设置 0.8 秒超时，防止外部接口卡死
+    $ctx = stream_context_create(['http' => ['timeout' => 0.8]]);
+    $res = @file_get_contents("http://ip-api.com/json/{$ip}?lang=zh-CN", false, $ctx);
+    
+    $info = '未知归属地';
+    if ($res) {
+        $data = json_decode($res, true);
+        if ($data && $data['status'] === 'success') {
+            $info = trim(($data['country'] ?? '') . ' ' . ($data['regionName'] ?? '') . ' ' . ($data['city'] ?? ''));
+        }
+    }
+    
+    // 写入缓存并标记变动
+    $ipCache[$ip] = $info;
+    $cacheChanged = true;
+    return $info;
+}
+
 foreach ($lines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
         $ip = $matches[1];
@@ -73,10 +106,13 @@ foreach ($lines as $line) {
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         $formattedTime = $dt ? $dt->setTimezone($targetTimeZone)->format('Y-m-d H:i:s') : $timeRaw;
 
+        // 获取 IP 归属地（优先从本地缓存读取）
+        $ipInfo = getIpInfoFast($ip, $ipCache, $cacheChanged);
+
         $result[] = [
             'time'    => $formattedTime,
             'ip'      => $ip,
-            'ip_info' => '获取中...', // 【优化 2】配合前端异步请求 IP 归属地，后端直接返回默认值
+            'ip_info' => $ipInfo, // 使用带缓存加速的查询结果
             'token'   => $token,
             'status'  => $status,
             'ua'      => $ua
@@ -84,6 +120,11 @@ foreach ($lines as $line) {
 
         // 【优化 3】已删掉原先的 if (count($result) >= 100) break; 限制，解除 100 条上限
     }
+}
+
+// 如果缓存有新增内容，统一保存到文件
+if ($cacheChanged) {
+    @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
 echo json_encode($result, JSON_UNESCAPED_UNICODE);
