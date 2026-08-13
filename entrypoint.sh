@@ -43,9 +43,10 @@ if [ ! -f /root/.acme.sh/acme.sh ]; then
 fi
 
 # ========================================================
-# 后台任务：证书申请 + 配置重载
+# 后台任务：证书申请 + 配置重载监听
 # ========================================================
 (while true; do
+  # 1. 检查是否有证书申请任务
   if [ -f /etc/nginx/rules/.cert_flag ]; then
     DOMAIN=$(cat /etc/nginx/rules/.cert_flag | tr -d '\r\n ')
     rm -f /etc/nginx/rules/.cert_flag
@@ -78,10 +79,11 @@ fi
       echo "{\"status\":\"success\",\"msg\":\"✅ $DOMAIN 证书申请成功，已自动生效！\"}" > /etc/nginx/rules/cert_status.json
     else
       echo "[Cert] ❌ $DOMAIN 证书申请失败"
-      echo "{\"status\":\"error\",\"msg\":\"❌ 申请失败！请确认：域名已解析到本机IP + 80端口开放 + 无CDN\"}" > /etc/nginx/rules/cert_status.json
+      echo "{\"status\":\"error","msg\":\"❌ 申请失败！请确认：域名已解析到本机IP + 80端口开放 + 无CDN\"}" > /etc/nginx/rules/cert_status.json
     fi
   fi
 
+  # 2. 检查是否有配置重载请求（支持文件内容比对或直接存在即重载）
   if [ -f /etc/nginx/rules/.reload_flag ]; then
     rm -f /etc/nginx/rules/.reload_flag
     nginx -s reload >/dev/null 2>&1
@@ -92,7 +94,7 @@ fi
 done) &
 
 # ========================================================
-# 启动服务
+# 启动 Nginx 主服务（前台运行）
 # ========================================================
 echo "[Init] 启动 Nginx 服务..."
 exec nginx -g 'daemon off;'
