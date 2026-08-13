@@ -168,7 +168,6 @@ if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'sa
     $uaList = $inputData['ua_blacklist'] ?? $_POST['ua_blacklist'] ?? [];
     $tokenList = $inputData['token_blacklist'] ?? $_POST['token_blacklist'] ?? [];
 
-    // 处理 IP：转换为 deny IP;
     $ipLines = [];
     foreach (array_filter(array_map('trim', $ipList)) as $ip) {
         if (strpos($ip, '#') === 0) continue;
@@ -179,7 +178,6 @@ if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'sa
     }
     $ipContent = '# 禁止访问的 IP'."\n" . implode("\n", $ipLines) . "\n";
 
-    // 处理 UA：转换为 if ($http_user_agent ~* "...") { return 403; }
     $uaLines = [];
     foreach (array_filter(array_map('trim', $uaList)) as $ua) {
         if (strpos($ua, '#') === 0) continue;
@@ -190,7 +188,6 @@ if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'sa
     }
     $uaContent = '# 禁止访问的 UA'."\n" . implode("\n", $uaLines) . "\n";
 
-    // 处理 Token：转换为 if ($arg_token = "...") { return 403; }
     $tokenLines = [];
     foreach (array_filter(array_map('trim', $tokenList)) as $token) {
         if (strpos($token, '#') === 0) continue;
@@ -244,7 +241,6 @@ if ($action === 'ban') {
     $lines = array_filter(array_map('trim', explode("\n", $currentContent)));
     $lines = array_filter($lines, function($l) { return strpos($l, '#') !== 0; });
 
-    // 根据不同类型格式化单条封禁规则
     $formattedValue = $value;
     if ($type === 'ip') {
         $clean = str_ireplace(['deny ', ';'], '', $value);
@@ -257,7 +253,6 @@ if ($action === 'ban') {
         $formattedValue = "if (\$arg_token = \"{$clean}\") { return 403; }";
     }
 
-    // 检查是否已经存在该条规则
     $exists = false;
     foreach ($lines as $line) {
         if ($line === $formattedValue) {
@@ -284,20 +279,9 @@ if ($action === 'ban') {
 }
 
 // ========================================================
-// ✅ 5. 读取配置
+// ✅ 4.2 补丁：获取黑名单完整列表 (对应前端 fetchBlacklistRules)
 // ========================================================
-if ($action === 'get_config') {
-    $domain = '';
-    if (file_exists(NGINX_CONF)) {
-        $confContent = file_get_contents(NGINX_CONF);
-        if (preg_match('/set\s+\$backend_url\s+"https?:\/\/([^"]+)";/i', $confContent, $m)) {
-            $domain = trim($m[1]);
-        } elseif (preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', $confContent, $m)) {
-            $domain = trim($m[1]);
-        }
-    }
-
-    // 解析配置文件的辅助函数：反向还原出纯净的值给前端展示
+if ($action === 'list') {
     $parseIpList = function($filePath) {
         if (!file_exists($filePath)) return [];
         $lines = explode("\n", file_get_contents($filePath));
@@ -305,7 +289,6 @@ if ($action === 'get_config') {
         foreach ($lines as $l) {
             $l = trim($l);
             if (empty($l) || strpos($l, '#') === 0) continue;
-            // 尝试剥离 deny 与分号
             $l = preg_replace('/^deny\s+/i', '', $l);
             $l = rtrim($l, ';');
             $res[] = trim($l, '"');
@@ -320,7 +303,64 @@ if ($action === 'get_config') {
         foreach ($lines as $l) {
             $l = trim($l);
             if (empty($l) || strpos($l, '#') === 0) continue;
-            // 尝试从 if 语句中提取引号包裹的内容
+            if (preg_match('/~*\s*"([^"]+)"/', $l, $m)) {
+                $res[] = stripslashes($m[1]);
+            } elseif (preg_match('/=\s*"([^"]+)"/', $l, $m)) {
+                $res[] = stripslashes($m[1]);
+            } else {
+                $res[] = ltrim(trim($l), '# ');
+            }
+        }
+        return array_filter($res);
+    };
+
+    echo json_encode([
+        'status' => 'success',
+        'code'   => 200,
+        'data'   => [
+            'ip'    => $parseIpList(RULES_DIR.'ip_blacklist.conf'),
+            'ua'    => $parseUaTokenList(RULES_DIR.'ua_blacklist.conf'),
+            'token' => $parseUaTokenList(RULES_DIR.'token_blacklist.conf'),
+        ]
+    ], JSON_UNESCAPED_UNICODE);
+    exit;
+}
+
+// ========================================================
+// ✅ 5. 读取配置
+// ========================================================
+if ($action === 'get_config') {
+    $domain = '';
+    if (file_exists(NGINX_CONF)) {
+        $confContent = file_get_contents(NGINX_CONF);
+        if (preg_match('/set\s+\$backend_url\s+"https?:\/\/([^"]+)";/i', $confContent, $m)) {
+            $domain = trim($m[1]);
+        } elseif (preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', $confContent, $m)) {
+            $domain = trim($m[1]);
+        }
+    }
+
+    $parseIpList = function($filePath) {
+        if (!file_exists($filePath)) return [];
+        $lines = explode("\n", file_get_contents($filePath));
+        $res = [];
+        foreach ($lines as $l) {
+            $l = trim($l);
+            if (empty($l) || strpos($l, '#') === 0) continue;
+            $l = preg_replace('/^deny\s+/i', '', $l);
+            $l = rtrim($l, ';');
+            $res[] = trim($l, '"');
+        }
+        return array_filter($res);
+    };
+
+    $parseUaTokenList = function($filePath) {
+        if (!file_exists($filePath)) return [];
+        $lines = explode("\n", file_get_contents($filePath));
+        $res = [];
+        foreach ($lines as $l) {
+            $l = trim($l);
+            if (empty($l) || strpos($l, '#') === 0) continue;
             if (preg_match('/~*\s*"([^"]+)"/', $l, $m)) {
                 $res[] = stripslashes($m[1]);
             } elseif (preg_match('/=\s*"([^"]+)"/', $l, $m)) {
