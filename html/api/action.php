@@ -34,7 +34,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// ✅ 1. 更新反代目标域名（使用超级宽松的正则兼容任意缩进和引号）
+// ✅ 1. 更新反代目标域名（使用按行精准定位替换，100%生效）
 // ========================================================
 if ($action === 'update_upstream') {
     $t = trim($inputData['target_domain'] ?? $_POST['target_domain'] ?? '');
@@ -50,11 +50,21 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    $c = file_get_contents(NGINX_CONF);
+    // 逐行读取并精准替换 backend_url 这一行
+    $lines = file(NGINX_CONF);
+    $newLines = [];
+    $updated = false;
+    foreach ($lines as $line) {
+        if (strpos($line, '$backend_url') !== false && strpos($line, 'set') !== false) {
+            $newLines[] = "        set \$backend_url \"https://{$t}\";\n";
+            $updated = true;
+        } else {
+            $newLines[] = $line;
+        }
+    }
     
-    // 宽松正则匹配替换后端变量
-    $c = preg_replace('/\s*set\s+\$backend_url\s+"https?:\/\/[^"]*";/i', "\n        set \$backend_url \"https://{$t}\";", $c);
-    $c = preg_replace('/\s*proxy_pass\s+\$backend_url;/i', "\n        proxy_pass \$backend_url;", $c);
+    // 如果配置文件里本来没有这行，直接把整段内容写回去或者按默认处理
+    $c = implode('', $newLines);
 
     safeWriteFile(RULES_DIR . 'upstream.conf', $t);
 
@@ -115,7 +125,7 @@ if ($action === 'cert_status') {
                     $domain = trim(file_get_contents(RULES_DIR.'domain.conf'));
                 }
                 if (empty($domain)) {
-                    $domain = 'sub.befriends.wiki';
+                    $domain = 'befriends.one';
                 }
 
                 echo json_encode([
