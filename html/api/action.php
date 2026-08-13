@@ -11,6 +11,9 @@ define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 header('Content-Type: application/json; charset=utf-8');
 require_login();
 
+// 强制设置时区为北京时间 (UTC+8)，确保获取到的证书到期时间准确
+date_default_timezone_set('Asia/Shanghai');
+
 $inputData = json_decode(file_get_contents('php://input'), true) ?? [];
 $action = trim($inputData['action'] ?? $_POST['action'] ?? $_GET['action'] ?? '');
 $reloadFlag = RULES_DIR . '.reload_flag';
@@ -132,7 +135,7 @@ if ($action === 'cert_status') {
                     $domain = trim(file_get_contents(RULES_DIR.'domain.conf'));
                 }
                 if (empty($domain)) {
-                    $domain = 'befriends.one';
+                    $domain = 'example.com';
                 }
 
                 echo json_encode([
