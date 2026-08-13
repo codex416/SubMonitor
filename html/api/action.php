@@ -2,7 +2,7 @@
 require_once __DIR__ . '/auth.php';
 
 // 统一用容器内标准路径，确保100%能找到文件！
-define('RULES_DIR',    '/etc/nginx/rules/');
+define('RULES_DIR',    '/root/SubMonitor/rules/');
 define('NGINX_CONF',   '/etc/nginx/conf.d/default.conf');
 define('SSL_DIR',      '/etc/nginx/ssl/');
 define('LOGIN_PHP',    __DIR__ . '/login.php'); 
