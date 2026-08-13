@@ -74,7 +74,7 @@ foreach ($lines as $line) {
         $parsedUrl = parse_url($url);
         $path = $parsedUrl['path'] ?? $url;
 
-        # 核心修复：放行证书和反代相关的 API 请求
+        # 放行证书和反代相关的 API 请求
         if ((strpos($url, '/api/') !== false && strpos($url, 'cert') === false && strpos($url, 'domain') === false) || $path === '/' || $path === '/index.html' || $path === '/login.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff)$/i', $path)) {
             continue;
         }
