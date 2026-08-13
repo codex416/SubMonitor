@@ -34,7 +34,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// ✅ 更新反代域名
+// ✅ 更新反代域名（全面兼容变量代理与直接代理）
 // ========================================================
 if ($action === 'update_upstream') {
     $t = trim($inputData['target_domain'] ?? $_POST['target_domain'] ?? '');
@@ -44,20 +44,30 @@ if ($action === 'update_upstream') {
     }
     $t = preg_replace('/^https?:\/\//i', '', $t);
     $t = rtrim($t, '/');
+
     if (!file_exists(NGINX_CONF)) {
         echo json_encode(['status'=>'error','message'=>'找不到Nginx配置文件：'.NGINX_CONF], JSON_UNESCAPED_UNICODE);
         exit;
     }
+
     $c = file_get_contents(NGINX_CONF);
+    
+    // 兼容各种形式的后端变量或代理修改
     $c = preg_replace('/set\s+\$backend_url\s+"https?:\/\/[^"]+";/i', "set \$backend_url \"https://{$t}\";", $c);
     $c = preg_replace('/proxy_pass\s+https?:\/\/[^\/;\s]+;/i', "proxy_pass https://{$t};", $c);
     $c = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/i', "proxy_set_header Host {$t};", $c);
+
+    // 如果是用 upstream.conf 配合的架构，同时写入文件
+    safeWriteFile(RULES_DIR . 'upstream.conf', $t);
+
     if (!safeWriteFile(NGINX_CONF, $c)) {
         echo json_encode(['status'=>'error','message'=>'写入配置失败，请检查权限'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+
     @file_put_contents($reloadFlag, (string)time());
     @exec('nginx -s reload >/dev/null 2>&1 &');
+    
     echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新：{$t}，配置已生效"], JSON_UNESCAPED_UNICODE);
     exit;
 }
@@ -71,7 +81,6 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
         echo json_encode(['status'=>'error','message'=>'域名不能为空'], JSON_UNESCAPED_UNICODE);
         exit;
     }
-    // 同时写入标记和 domain.conf 配置文件
     safeWriteFile(RULES_DIR.'domain.conf', $d);
     if (!safeWriteFile(RULES_DIR.'.cert_flag', "{$d}\n")) {
         echo json_encode(['status'=>'error','message'=>'写入证书申请标记失败'], JSON_UNESCAPED_UNICODE);
@@ -85,7 +94,7 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态（强制从真实证书中提取最新域名与信息）
+// ✅ 获取证书状态（实时读取 cert.pem 保证域名和有效期正确）
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
@@ -103,7 +112,6 @@ if ($action === 'cert_status') {
                 
                 $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
                 
-                // 优先从证书本身读取真实绑定域名，其次读取 domain.conf
                 $domain = $certData['subject']['CN'] ?? '';
                 if (empty($domain) && file_exists(RULES_DIR.'domain.conf')) {
                     $domain = trim(file_get_contents(RULES_DIR.'domain.conf'));
@@ -175,8 +183,13 @@ if ($action === 'update_blacklist') {
 // ========================================================
 if ($action === 'get_config') {
     $domain = '';
-    if (file_exists(NGINX_CONF) && preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', file_get_contents(NGINX_CONF), $m)) {
-        $domain = trim($m[1]);
+    if (file_exists(NGINX_CONF)) {
+        $confContent = file_get_contents(NGINX_CONF);
+        if (preg_match('/set\s+\$backend_url\s+"https?:\/\/([^"]+)";/i', $confContent, $m)) {
+            $domain = trim($m[1]);
+        } elseif (preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', $confContent, $m)) {
+            $domain = trim($m[1]);
+        }
     }
 
     echo json_encode([
