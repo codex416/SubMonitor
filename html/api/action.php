@@ -77,33 +77,15 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
     }
     safeWriteFile(RULES_DIR.'cert_status.json', json_encode([
         'status'=>'processing','msg'=>"🔄 域名 {$d} 已提交，后台正在申请证书..."
-    ]));
+    ], JSON_UNESCAPED_UNICODE));
     echo json_encode(['status'=>'success','message'=>"✅ 域名 {$d} 已保存，证书申请已在后台启动"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
 // ========================================================
-// ✅ 获取证书状态
+// ✅ 获取证书状态（完美兼容动态解析与强制刷新）
 // ========================================================
 if ($action === 'cert_status') {
-    $certJson = @file_get_contents(RULES_DIR.'cert_status.json');
-    if ($certJson) {
-        $certData = json_decode($certJson, true);
-        if ($certData && ($certData['status']==='success' || isset($certData['cert']))) {
-            echo json_encode(['status'=>'success','cert'=>$certData['cert']??null,'msg'=>$certData['msg']??''], JSON_UNESCAPED_UNICODE);
-            exit;
-        }
-    }
-
-    $u = '';
-    if (file_exists(NGINX_CONF) && preg_match('/proxy_pass\s+https?:\/\/([^\/;\s]+)/i', file_get_contents(NGINX_CONF), $m)) {
-        $u = trim($m[1]);
-    }
-    if (empty($u)) {
-        echo json_encode(['status'=>'success','cert'=>null,'msg'=>'尚未配置域名'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-
     $certPath = SSL_DIR.'cert.pem';
     if (!file_exists($certPath)) {
         echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
@@ -111,36 +93,32 @@ if ($action === 'cert_status') {
     }
 
     $pem = @file_get_contents($certPath);
-    if (!$pem) {
+    if (!$pem || !preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
         echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书文件读取失败'], JSON_UNESCAPED_UNICODE);
         exit;
     }
 
-    $certs = [];
-    if (preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
-        $certs = $m[0];
+    $leaf = $m[0][0] ?? '';
+    $certData = openssl_x509_parse($leaf);
+    
+    if (!$certData) {
+        echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书解析失败'], JSON_UNESCAPED_UNICODE);
+        exit;
     }
-    $leaf = $certs[0] ?? '';
-    $valid_to = $issuer = '';
 
-    if (preg_match('/Not After\s*[:=]\s*(.+)/i', $leaf, $m)) {
-        $valid_to = trim($m[1]);
-    }
-    if (preg_match('/Issuer\s*[:=]\s*.*?CN\s*=\s*([^,\n\/]+)/i', $leaf, $m)) {
-        $issuer = trim($m[1]);
-    }
-    if (empty($issuer)) $issuer = 'Self-Signed';
-
-    $ts = $valid_to ? strtotime($valid_to) : 0;
-    $daysLeft = $ts ? ceil(($ts - time()) / 86400) : 0;
-    $fmtDate = $ts ? date('Y-m-d H:i:s', $ts) : '';
+    $validToTime = $certData['validTo_time_t'] ?? time();
+    $valid_to = date('Y-m-d H:i:s', $validToTime);
+    $daysLeft = ceil(($validToTime - time()) / 86400);
+    
+    $issuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
+    $domain = $certData['subject']['CN'] ?? 'sub.befriends.wiki';
 
     echo json_encode([
         'status'=>'success',
         'cert'=>[
-            'domain'=>$u,
+            'domain'=>$domain,
             'issuer'=>$issuer,
-            'valid_to'=>$fmtDate,
+            'valid_to'=>$valid_to,
             'days_left'=>$daysLeft > 0 ? $daysLeft : 0
         ]
     ], JSON_UNESCAPED_UNICODE);
@@ -196,7 +174,7 @@ if ($action === 'get_config') {
 }
 
 // ========================================================
-// ✅ 修改密码 —— 已修复为校验原密码并写入 .admin_password
+// ✅ 修改密码
 // ========================================================
 if ($action === 'change_password') {
     $old = trim($inputData['old_password'] ?? $_POST['old_password'] ?? '');
