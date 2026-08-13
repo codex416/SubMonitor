@@ -1,36 +1,36 @@
 services:
   php:
-    image: php:8.2-fpm-alpine[cite: 2]
-    container_name: submonitor-php[cite: 2]
-    user: root[cite: 2]
-    restart: always[cite: 2]
+    image: php:8.2-fpm-alpine
+    container_name: submonitor-php
+    user: root
+    restart: always
     volumes:
-      - ./html:/var/www/html[cite: 2]
-      - ./nginx:/etc/nginx/conf.d[cite: 2]
-      - ./rules:/etc/nginx/rules[cite: 2]
-      - ./ssl:/etc/nginx/ssl[cite: 2]
-      - log-data:/var/log/nginx[cite: 2]
+      - ./html:/var/www/html
+      - ./nginx:/etc/nginx/conf.d
+      - ./rules:/etc/nginx/rules
+      - ./ssl:/etc/nginx/ssl
+      - log-data:/var/log/nginx
 
   nginx:
-    image: nginx:alpine[cite: 2]
-    container_name: submonitor-nginx[cite: 2]
-    restart: always[cite: 2]
+    image: nginx:alpine
+    container_name: submonitor-nginx
+    restart: always
     ports:
-      - "80:80"[cite: 2]
-      - "443:443"[cite: 2]
+      - "80:80"
+      - "443:443"
     volumes:
-      - ./html:/var/www/html[cite: 2]
-      - ./nginx:/etc/nginx/conf.d[cite: 2]
-      - ./rules:/etc/nginx/rules[cite: 2]
-      - ./ssl:/etc/nginx/ssl[cite: 2]
-      - ./entrypoint.sh:/entrypoint.sh[cite: 2]
-      - log-data:/var/log/nginx[cite: 2]
+      - ./html:/var/www/html
+      - ./nginx:/etc/nginx/conf.d
+      - ./rules:/etc/nginx/rules
+      - ./ssl:/etc/nginx/ssl
+      - ./entrypoint.sh:/entrypoint.sh
+      - log-data:/var/log/nginx
     depends_on:
-      - php[cite: 2]
+      - php
     entrypoint: [
       "sh", "-c",
       "chmod +x /entrypoint.sh && chmod -R 777 /var/www/html /etc/nginx/conf.d /etc/nginx/rules /etc/nginx/ssl && /entrypoint.sh"
-    ][cite: 2]
+    ]
 
 volumes:
-  log-data:[cite: 2]
+  log-data:
