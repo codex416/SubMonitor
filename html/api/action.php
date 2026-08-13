@@ -161,16 +161,45 @@ if ($action === 'cert_status') {
 }
 
 // ========================================================
-// ✅ 4. 更新黑名单（兼容所有常见命名）
+// ✅ 4. 更新黑名单（兼容所有常见命名，并格式化为标准 Nginx 语法）
 // ========================================================
 if ($action === 'update_blacklist' || $action === 'blacklist' || $action === 'save_blacklist') {
     $ipList = $inputData['ip_blacklist'] ?? $_POST['ip_blacklist'] ?? [];
     $uaList = $inputData['ua_blacklist'] ?? $_POST['ua_blacklist'] ?? [];
     $tokenList = $inputData['token_blacklist'] ?? $_POST['token_blacklist'] ?? [];
 
-    $ipContent = '# 禁止访问的IP'."\n".implode("\n", array_filter(array_map('trim', $ipList)))."\n";
-    $uaContent = '# 禁止访问的客户端标识'."\n".implode("\n", array_filter(array_map('trim', $uaList)))."\n";
-    $tokenContent = '# 禁止访问的Token'."\n".implode("\n", array_filter(array_map('trim', $tokenList)))."\n";
+    // 处理 IP：转换为 deny IP;
+    $ipLines = [];
+    foreach (array_filter(array_map('trim', $ipList)) as $ip) {
+        if (strpos($ip, '#') === 0) continue;
+        $clean = str_ireplace(['deny ', ';'], '', $ip);
+        if (!empty($clean)) {
+            $ipLines[] = "deny {$clean};";
+        }
+    }
+    $ipContent = '# 禁止访问的 IP'."\n" . implode("\n", $ipLines) . "\n";
+
+    // 处理 UA：转换为 if ($http_user_agent ~* "...") { return 403; }
+    $uaLines = [];
+    foreach (array_filter(array_map('trim', $uaList)) as $ua) {
+        if (strpos($ua, '#') === 0) continue;
+        $clean = addslashes($ua);
+        if (!empty($clean)) {
+            $uaLines[] = "if (\$http_user_agent ~* \"{$clean}\") { return 403; }";
+        }
+    }
+    $uaContent = '# 禁止访问的 UA'."\n" . implode("\n", $uaLines) . "\n";
+
+    // 处理 Token：转换为 if ($arg_token = "...") { return 403; }
+    $tokenLines = [];
+    foreach (array_filter(array_map('trim', $tokenList)) as $token) {
+        if (strpos($token, '#') === 0) continue;
+        $clean = addslashes($token);
+        if (!empty($clean)) {
+            $tokenLines[] = "if (\$arg_token = \"{$clean}\") { return 403; }";
+        }
+    }
+    $tokenContent = '# 禁止访问的 Token'."\n" . implode("\n", $tokenLines) . "\n";
 
     $ok1 = safeWriteFile(RULES_DIR.'ip_blacklist.conf', $ipContent);
     $ok2 = safeWriteFile(RULES_DIR.'ua_blacklist.conf', $uaContent);
@@ -215,8 +244,30 @@ if ($action === 'ban') {
     $lines = array_filter(array_map('trim', explode("\n", $currentContent)));
     $lines = array_filter($lines, function($l) { return strpos($l, '#') !== 0; });
 
-    if (!in_array($value, $lines)) {
-        $lines[] = $value;
+    // 根据不同类型格式化单条封禁规则
+    $formattedValue = $value;
+    if ($type === 'ip') {
+        $clean = str_ireplace(['deny ', ';'], '', $value);
+        $formattedValue = "deny {$clean};";
+    } elseif ($type === 'ua') {
+        $clean = addslashes($value);
+        $formattedValue = "if (\$http_user_agent ~* \"{$clean}\") { return 403; }";
+    } elseif ($type === 'token') {
+        $clean = addslashes($value);
+        $formattedValue = "if (\$arg_token = \"{$clean}\") { return 403; }";
+    }
+
+    // 检查是否已经存在该条规则
+    $exists = false;
+    foreach ($lines as $line) {
+        if ($line === $formattedValue) {
+            $exists = true;
+            break;
+        }
+    }
+
+    if (!$exists) {
+        $lines[] = $formattedValue;
     }
 
     $newContent = '# 禁止访问的 ' . strtoupper($type) . "\n" . implode("\n", $lines) . "\n";
@@ -246,13 +297,48 @@ if ($action === 'get_config') {
         }
     }
 
+    // 解析配置文件的辅助函数：反向还原出纯净的值给前端展示
+    $parseIpList = function($filePath) {
+        if (!file_exists($filePath)) return [];
+        $lines = explode("\n", file_get_contents($filePath));
+        $res = [];
+        foreach ($lines as $l) {
+            $l = trim($l);
+            if (empty($l) || strpos($l, '#') === 0) continue;
+            // 尝试剥离 deny 与分号
+            $l = preg_replace('/^deny\s+/i', '', $l);
+            $l = rtrim($l, ';');
+            $res[] = trim($l, '"');
+        }
+        return array_filter($res);
+    };
+
+    $parseUaTokenList = function($filePath) {
+        if (!file_exists($filePath)) return [];
+        $lines = explode("\n", file_get_contents($filePath));
+        $res = [];
+        foreach ($lines as $l) {
+            $l = trim($l);
+            if (empty($l) || strpos($l, '#') === 0) continue;
+            // 尝试从 if 语句中提取引号包裹的内容
+            if (preg_match('/~*\s*"([^"]+)"/', $l, $m)) {
+                $res[] = stripslashes($m[1]);
+            } elseif (preg_match('/=\s*"([^"]+)"/', $l, $m)) {
+                $res[] = stripslashes($m[1]);
+            } else {
+                $res[] = ltrim(trim($l), '# ');
+            }
+        }
+        return array_filter($res);
+    };
+
     echo json_encode([
         'status'=>'success',
         'config'=>[
             'target_domain'=>$domain,
-            'ip_blacklist'=>file_exists(RULES_DIR.'ip_blacklist.conf') ? array_filter(array_map('trim', explode("\n", ltrim(trim(file_get_contents(RULES_DIR.'ip_blacklist.conf')), '# ')))) : [],
-            'ua_blacklist'=>file_exists(RULES_DIR.'ua_blacklist.conf') ? array_filter(array_map('trim', explode("\n", ltrim(trim(file_get_contents(RULES_DIR.'ua_blacklist.conf')), '# ')))) : [],
-            'token_blacklist'=>file_exists(RULES_DIR.'token_blacklist.conf') ? array_filter(array_map('trim', explode("\n", ltrim(trim(file_get_contents(RULES_DIR.'token_blacklist.conf')), '# ')))) : [],
+            'ip_blacklist'=>$parseIpList(RULES_DIR.'ip_blacklist.conf'),
+            'ua_blacklist'=>$parseUaTokenList(RULES_DIR.'ua_blacklist.conf'),
+            'token_blacklist'=>$parseUaTokenList(RULES_DIR.'token_blacklist.conf'),
         ]
     ], JSON_UNESCAPED_UNICODE);
     exit;
