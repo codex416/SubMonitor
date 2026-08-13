@@ -34,7 +34,7 @@ function safeWriteFile(string $filePath, string $content, bool $append = false):
 }
 
 // ========================================================
-// ✅ 更新反代域名（全面兼容变量代理与直接代理）
+// ✅ 更新反代域名（直接写文件，利用 Nginx 变量动态生效，无需 reload）
 // ========================================================
 if ($action === 'update_upstream') {
     $t = trim($inputData['target_domain'] ?? $_POST['target_domain'] ?? '');
@@ -51,13 +51,10 @@ if ($action === 'update_upstream') {
     }
 
     $c = file_get_contents(NGINX_CONF);
-    
-    // 兼容各种形式的后端变量或代理修改
     $c = preg_replace('/set\s+\$backend_url\s+"https?:\/\/[^"]+";/i', "set \$backend_url \"https://{$t}\";", $c);
     $c = preg_replace('/proxy_pass\s+https?:\/\/[^\/;\s]+;/i', "proxy_pass https://{$t};", $c);
     $c = preg_replace('/proxy_set_header\s+Host\s+[^;]+;/i', "proxy_set_header Host {$t};", $c);
 
-    // 如果是用 upstream.conf 配合的架构，同时写入文件
     safeWriteFile(RULES_DIR . 'upstream.conf', $t);
 
     if (!safeWriteFile(NGINX_CONF, $c)) {
@@ -65,10 +62,7 @@ if ($action === 'update_upstream') {
         exit;
     }
 
-    @file_put_contents($reloadFlag, (string)time());
-    @exec('nginx -s reload >/dev/null 2>&1 &');
-    
-    echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新：{$t}，配置已生效"], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status'=>'success','message'=>"✅ 反代域名已更新：{$t}，配置已实时生效"], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -94,7 +88,7 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 }
 
 // ========================================================
-// ✅ 获取证书状态（实时读取 cert.pem 保证域名和有效期正确）
+// ✅ 获取证书状态（实时读取 cert.pem）
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
@@ -166,9 +160,6 @@ if ($action === 'update_blacklist') {
     $ok1 = safeWriteFile(RULES_DIR.'ip_blacklist.conf', $ipContent);
     $ok2 = safeWriteFile(RULES_DIR.'ua_blacklist.conf', $uaContent);
     $ok3 = safeWriteFile(RULES_DIR.'token_blacklist.conf', $tokenContent);
-
-    @file_put_contents($reloadFlag, (string)time());
-    @exec('nginx -s reload >/dev/null 2>&1 &');
 
     if ($ok1 && $ok2 && $ok3) {
         echo json_encode(['status'=>'success','message'=>'✅ 黑名单已更新，配置已生效'], JSON_UNESCAPED_UNICODE);
