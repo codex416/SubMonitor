@@ -5,25 +5,25 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
     <!-- 关键：适配手机浏览器顶部栏，消除色差 -->
     <meta name="theme-color" content="#ffffff">
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="default">
-    <title>SubMonitor 登录</title>
+    <title>系统登录</title>
     <style>
         :root {
             --primary: #2563eb;
             --primary-light: #3b82f6;
             --primary-hover: #1d4ed8;
-            --bg-page: #ffffff;
-            --bg-card: #ffffff;
-            --bg-input: #f8fafc;
-            --border: #e2e8f0;
+            --bg-page: #f8fafc;
+            --bg-card: rgba(255, 255, 255, 0.85);
+            --bg-input: #f1f5f9;
+            --border: rgba(226, 232, 240, 0.8);
             --border-focus: #2563eb;
-            --text-main: #1e293b;
+            --text-main: #0f172a;
             --text-secondary: #64748b;
             --text-placeholder: #94a3b8;
             --error: #dc2626;
-            --shadow-sm: 0 1px 3px rgba(0,0,0,0.04);
-            --shadow-card: 0 10px 40px rgba(37, 99, 235, 0.08);
+            --shadow-card: 0 20px 40px -15px rgba(15, 23, 42, 0.05);
         }
 
         * {
@@ -40,75 +40,79 @@
         body {
             background-color: var(--bg-page);
             color: var(--text-main);
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", Roboto, sans-serif;
             display: flex;
             justify-content: center;
             align-items: center;
             padding: 16px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        /* 呼吸感背景微光 */
+        body::before {
+            content: '';
+            position: absolute;
+            width: 400px;
+            height: 400px;
+            background: radial-gradient(circle, rgba(37,99,235,0.06) 0%, rgba(255,255,255,0) 70%);
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            z-index: 0;
+            pointer-events: none;
         }
 
         .login-card {
+            position: relative;
+            z-index: 1;
             width: 100%;
-            max-width: 400px;
+            max-width: 360px;
             background: var(--bg-card);
-            border-radius: 16px;
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border-radius: 20px;
             border: 1px solid var(--border);
             box-shadow: var(--shadow-card);
             padding: 2.5rem 2rem;
-            animation: cardIn 0.6s ease-out both;
+            animation: cardIn 0.8s cubic-bezier(0.16, 1, 0.3, 1) both;
         }
 
         @keyframes cardIn {
             from {
                 opacity: 0;
-                transform: translateY(12px);
+                transform: translateY(16px) scale(0.98);
             }
             to {
                 opacity: 1;
-                transform: translateY(0);
+                transform: translateY(0) scale(1);
             }
         }
 
-        .login-header {
-            text-align: center;
-            margin-bottom: 2.2rem;
-        }
-
-        .login-header h2 {
-            font-size: 1.55rem;
-            font-weight: 700;
+        .login-title {
+            font-size: 1.25rem;
+            font-weight: 600;
             color: var(--text-main);
-            margin-bottom: 0.4rem;
-            letter-spacing: 0.3px;
-        }
-
-        .login-header p {
-            font-size: 0.95rem;
-            color: var(--text-secondary);
+            margin-bottom: 1.75rem;
+            letter-spacing: -0.3px;
+            text-align: center;
         }
 
         .input-wrap {
-            margin-bottom: 1.25rem;
-        }
-
-        .input-wrap label {
-            display: block;
-            margin-bottom: 0.55rem;
-            font-size: 0.92rem;
-            color: var(--text-main);
-            font-weight: 500;
+            position: relative;
+            margin-bottom: 1.5rem;
         }
 
         .input-wrap input {
             width: 100%;
-            padding: 0.95rem 1.1rem;
+            padding: 14px 16px;
             background: var(--bg-input);
-            border: 1.5px solid var(--border);
-            border-radius: 10px;
+            border: 1.5px solid transparent;
+            border-radius: 12px;
             color: var(--text-main);
-            font-size: 1rem;
+            font-size: 0.95rem;
             outline: none;
-            transition: all 0.22s ease;
+            transition: all 0.25s ease;
         }
 
         .input-wrap input::placeholder {
@@ -116,30 +120,29 @@
         }
 
         .input-wrap input:focus {
+            background: #ffffff;
             border-color: var(--border-focus);
-            background: #fff;
             box-shadow: 0 0 0 4px rgba(37, 99, 235, 0.08);
         }
 
         .submit-btn {
             width: 100%;
-            padding: 0.95rem;
-            margin-top: 0.3rem;
-            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            padding: 14px;
+            background: #0f172a;
             color: #ffffff;
             border: none;
-            border-radius: 10px;
-            font-size: 1rem;
+            border-radius: 12px;
+            font-size: 0.95rem;
             font-weight: 600;
             cursor: pointer;
-            transition: all 0.22s ease;
-            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.18);
+            transition: all 0.25s ease;
+            box-shadow: 0 4px 12px rgba(15, 23, 42, 0.15);
         }
 
         .submit-btn:hover {
-            background: var(--primary-hover);
+            background: #2563eb;
             transform: translateY(-1px);
-            box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.25);
         }
 
         .submit-btn:active {
@@ -148,20 +151,20 @@
         }
 
         .submit-btn:disabled {
-            opacity: 0.65;
+            opacity: 0.7;
             cursor: not-allowed;
             transform: none;
             box-shadow: 0 2px 8px rgba(37, 99, 235, 0.12);
         }
 
         .error-box {
-            margin-top: 1.1rem;
-            padding: 0.8rem 1rem;
+            margin-top: 1.25rem;
+            padding: 10px;
             background: #fef2f2;
-            border: 1px solid #fecaca;
-            border-radius: 10px;
+            border: 1px solid #fee2e2;
+            border-radius: 8px;
             color: var(--error);
-            font-size: 0.9rem;
+            font-size: 0.85rem;
             text-align: center;
             display: none;
         }
@@ -173,8 +176,8 @@
 
         @keyframes shake {
             0%,100%{transform:translateX(0)}
-            25%{transform:translateX(-5px)}
-            75%{transform:translateX(5px)}
+            25%{transform:translateX(-4px)}
+            75%{transform:translateX(4px)}
         }
 
         @media (max-width: 480px) {
@@ -183,25 +186,18 @@
             }
             .login-card {
                 padding: 2rem 1.4rem;
-                border-radius: 14px;
-            }
-            .login-header h2 {
-                font-size: 1.4rem;
+                border-radius: 16px;
             }
         }
     </style>
 </head>
 <body>
     <div class="login-card">
-        <div class="login-header">
-            <h2>SubMonitor</h2>
-            <p>系统登录 · 请验证管理密码</p>
-        </div>
+        <div class="login-title">系统登录</div>
         <div class="input-wrap">
-            <label>管理密码</label>
-            <input type="password" id="password" placeholder="请输入密码" autocomplete="current-password">
+            <input type="password" id="password" placeholder="请输入管理密码" autocomplete="current-password">
         </div>
-        <button class="submit-btn" id="loginBtn">进入控制台</button>
+        <button class="submit-btn" id="loginBtn">登录</button>
         <div class="error-box" id="errorTip"></div>
     </div>
 
@@ -217,7 +213,6 @@
             async function handleLogin() {
                 const password = passwordInput.value.trim();
                 errorTip.classList.remove('show');
-                errorTip.textContent = '';
 
                 if (!password) {
                     showError('请输入管理密码');
@@ -226,7 +221,7 @@
                 }
 
                 loginBtn.disabled = true;
-                loginBtn.textContent = '校验中...';
+                loginBtn.textContent = '验证中...';
 
                 try {
                     const res = await fetch('/api/login.php', {
@@ -242,15 +237,15 @@
                         loginBtn.textContent = '登录成功';
                         setTimeout(() => location.href = '/', 360);
                     } else {
-                        showError(data.msg || '密码错误，请核对后重试');
+                        showError(data.msg || '密码错误，请重试');
                         passwordInput.value = '';
                         passwordInput.focus();
                     }
                 } catch (err) {
-                    showError(err.message || '请求异常，请稍后重试');
+                    showError(err.message || '连接服务器失败，请稍后重试');
                 } finally {
                     loginBtn.disabled = false;
-                    loginBtn.textContent = '进入控制台';
+                    loginBtn.textContent = '登录';
                 }
             }
 
