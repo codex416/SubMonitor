@@ -1677,7 +1677,7 @@
                 document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
                 
                 renderStats(allLogs, responseData);
-                renderAnalyticsCards(allLogs);
+                renderAnalyticsCards(responseData.analytics || {});
                 renderTableFiltered(totalCount);
             } catch (err) {
                 document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
@@ -1704,19 +1704,11 @@
             }
         }
 
-        function renderAnalyticsCards(logs) {
-            const todayStr = dateToYMD(new Date());
-            const todayLogs = logs.filter(l => l.time && l.time.startsWith(todayStr));
-
-            const ipStats = {};
-            todayLogs.forEach(l => {
-                if (!l.ip) return;
-                if (!ipStats[l.ip]) ipStats[l.ip] = { count: 0, info: l.ip_info };
-                ipStats[l.ip].count++;
-            });
-            const topIpList = Object.keys(ipStats)
-                .map(ip => ({ ip, ...ipStats[ip] }))
-                .sort((a, b) => b.count - a.count);
+        function renderAnalyticsCards(analyticsData) {
+            const topIpList = analyticsData.top_ips || [];
+            const topTokenList = analyticsData.top_tokens || [];
+            const susTokenList = analyticsData.sus_tokens || [];
+            const susIpList = analyticsData.sus_ips || [];
 
             renderCardList('list-top-ip', topIpList, item => {
                 const infoId = 'geo-top-ip-' + Math.random().toString(36).substring(2, 9);
@@ -1743,17 +1735,6 @@
             `;
             });
 
-            const tokenStats = {};
-            todayLogs.forEach(l => {
-                if (!l.token || l.token === '-') return;
-                if (!tokenStats[l.token]) tokenStats[l.token] = { count: 0, lastTime: l.time };
-                tokenStats[l.token].count++;
-                if (l.time > tokenStats[l.token].lastTime) tokenStats[l.token].lastTime = l.time;
-            });
-            const topTokenList = Object.keys(tokenStats)
-                .map(t => ({ token: t, ...tokenStats[t] }))
-                .sort((a, b) => b.count - a.count);
-
             renderCardList('list-top-token', topTokenList, item => {
                 const timeOnly = item.lastTime ? item.lastTime.split(' ')[1] : '';
                 return `
@@ -1773,17 +1754,6 @@
                 `;
             });
 
-            const tokenIpMap = {};
-            logs.forEach(l => {
-                if (!l.token || l.token === '-' || !l.ip) return;
-                if (!tokenIpMap[l.token]) tokenIpMap[l.token] = new Set();
-                tokenIpMap[l.token].add(l.ip);
-            });
-            const susTokenList = Object.keys(tokenIpMap)
-                .filter(t => tokenIpMap[t].size > 1)
-                .map(t => ({ token: t, ipCount: tokenIpMap[t].size }))
-                .sort((a, b) => b.ipCount - a.ipCount);
-
             renderCardList('list-sus-token', susTokenList, item => `
                 <div class="item-left">
                     <span class="rank-num">${item.rank}</span>
@@ -1798,17 +1768,6 @@
                     <span class="count-badge" style="color:var(--primary-red)">${item.ipCount} 个IP</span>
                 </div>
             `);
-
-            const ipTokenMap = {};
-            logs.forEach(l => {
-                if (!l.ip || !l.token || l.token === '-') return;
-                if (!ipTokenMap[l.ip]) ipTokenMap[l.ip] = { tokens: new Set(), info: l.ip_info };
-                ipTokenMap[l.ip].tokens.add(l.token);
-            });
-            const susIpList = Object.keys(ipTokenMap)
-                .filter(ip => ipTokenMap[ip].tokens.size > 1)
-                .map(ip => ({ ip, tokenCount: ipTokenMap[ip].tokens.size, info: ipTokenMap[ip].info }))
-                .sort((a, b) => b.tokenCount - a.tokenCount);
 
             renderCardList('list-sus-ip', susIpList, item => {
                 const infoId = 'geo-sus-ip-' + Math.random().toString(36).substring(2, 9);
@@ -1839,7 +1798,7 @@
         function renderCardList(containerId, list, templateFn) {
             const el = document.getElementById(containerId);
             if (!el) return;
-            if (list.length === 0) {
+            if (!list || list.length === 0) {
                 el.innerHTML = '<div style="color:var(--text-muted); font-size:0.75rem; text-align:center; padding:24px 0;">暂无记录</div>';
                 return;
             }
