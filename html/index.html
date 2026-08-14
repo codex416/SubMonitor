@@ -1776,7 +1776,6 @@
                 </div>
                 <div class="item-right">
                     <span class="count-badge">${item.count}次</span>
-                    <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
                 </div>
             `;
             });
@@ -1807,7 +1806,6 @@
                     </div>
                     <div class="item-right">
                         <span class="count-badge">${item.count}次</span>
-                        <button class="btn-ban" onclick="banTarget('token', '${escapeHtml(item.token)}')">🚫 封禁</button>
                     </div>
                 `;
             });
@@ -1835,7 +1833,6 @@
                 </div>
                 <div class="item-right">
                     <span class="count-badge" style="color:var(--primary-red)">${item.ipCount} 个IP</span>
-                    <button class="btn-ban" onclick="banTarget('token', '${escapeHtml(item.token)}')">🚫 封禁</button>
                 </div>
             `);
 
@@ -1871,7 +1868,6 @@
                 </div>
                 <div class="item-right">
                     <span class="count-badge" style="color:var(--primary-red)">${item.tokenCount} 个Token</span>
-                    <button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(item.ip)}')">🚫 封禁</button>
                 </div>
             `;
             });
@@ -1913,9 +1909,6 @@
                         ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${escapeHtml(l.ua)}</div>`
                         : '';
 
-                    const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
-                    const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
-
                     const infoId = 'm-geo-' + Math.random().toString(36).substring(2, 9);
                     if (!l.ip_info && l.ip && l.ip !== '-') {
                         setTimeout(() => {
@@ -1946,15 +1939,6 @@
                                         <div class="m-label">Token</div>
                                         <div class="m-value">${renderPillBox(l.token, 'Token')}</div>
                                     </div>
-                                    <div class="m-row">
-                                        <div class="m-label">操作</div>
-                                        <div class="m-value">
-                                            <div class="ban-actions">
-                                                ${banIpBtn}
-                                                ${banTokenBtn}
-                                            </div>
-                                        </div>
-                                    </div>
                                 </div>
                                 ${uaHtml}
                             </td>
@@ -1983,9 +1967,6 @@
                 if (currentPcPage > totalPages) currentPcPage = totalPages;
 
                 tbody.innerHTML = logs.map(l => {
-                    const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
-                    const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
-
                     const infoId = 'pc-geo-' + Math.random().toString(36).substring(2, 9);
                     if (!l.ip_info && l.ip && l.ip !== '-') {
                         setTimeout(() => {
@@ -1999,12 +1980,10 @@
                             <td style="color:#334155">${escapeHtml(l.time)}</td>
                             <td>
                                 ${renderPillBox(l.ip, 'IP')}
-                                ${banIpBtn}
                                 <div id="${infoId}" class="ip-sub">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                             </td>
                             <td>
                                 ${renderPillBox(l.token, 'Token')}
-                                ${banTokenBtn}
                             </td>
                             <td>${getStatusBadge(l.status)}</td>
                             <td>${getRemark(l.status)}</td>
