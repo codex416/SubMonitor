@@ -1590,22 +1590,24 @@
         function toggleExpand(el) { el.classList.toggle('expanded'); }
 
         function getStatusBadge(code) {
-            switch(code) {
-                case '200': return `<span class="badge badge-200">${code}</span>`;
-                case '400': return `<span class="badge badge-400">${code}</span>`;
-                case '401': return `<span class="badge badge-401">${code}</span>`;
-                case '403': return `<span class="badge badge-403">${code}</span>`;
-                case '404': return `<span class="badge badge-404">${code}</span>`;
-                case '429': return `<span class="badge badge-429">${code}</span>`;
+            const strCode = String(code);
+            switch(strCode) {
+                case '200': return `<span class="badge badge-200">${strCode}</span>`;
+                case '400': return `<span class="badge badge-400">${strCode}</span>`;
+                case '401': return `<span class="badge badge-401">${strCode}</span>`;
+                case '403': return `<span class="badge badge-403">${strCode}</span>`;
+                case '404': return `<span class="badge badge-404">${strCode}</span>`;
+                case '429': return `<span class="badge badge-429">${strCode}</span>`;
                 case '500':
                 case '502':
-                case '503': return `<span class="badge badge-500">${code}</span>`;
-                default: return `<span class="badge badge-other">${code}</span>`;
+                case '503': return `<span class="badge badge-500">${strCode}</span>`;
+                default: return `<span class="badge badge-other">${strCode}</span>`;
             }
         }
 
         function getRemarkText(code) {
-            switch(code) {
+            const strCode = String(code);
+            switch(strCode) {
                 case '200': return '拉取订阅';
                 case '400': return '伪造请求';
                 case '403': return '异常用户';
@@ -1618,7 +1620,8 @@
         }
 
         function getRemark(code) {
-            switch(code) {
+            const strCode = String(code);
+            switch(strCode) {
                 case '200': return '<span class="remark-text" style="color:#16a34a;">拉取订阅</span>';
                 case '400': return '<span class="remark-text" style="color:#b45309;">伪造请求</span>';
                 case '403': return '<span class="remark-text" style="color:#dc2626;">异常用户</span>';
@@ -1642,7 +1645,6 @@
 
         async function fetchData() {
             try {
-                // 判断是否为移动端，移动端动态传入 mobileDisplayCount 作为 limit
                 const isMobile = window.innerWidth <= 768;
                 const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
 
@@ -1655,7 +1657,6 @@
                 const now = new Date();
                 document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
                 
-                // 将真正的 totalCount 传递给 renderStats
                 renderStats(allLogs, totalCount);
                 renderAnalyticsCards(allLogs);
                 renderTableFiltered(totalCount);
@@ -1665,6 +1666,7 @@
         }
 
         function isWithinTimeRange(logTimeStr) {
+            if (!logTimeStr) return true;
             if (!lockedStartTime && !lockedEndTime) return true;
 
             let logFormatted = logTimeStr;
@@ -1687,13 +1689,11 @@
         }
 
         function filterTableData() {
-            currentPcPage = 1; // 筛选条件变动时重置回第1页
-            mobileDisplayCount = 20; // 移动端重置初始加载数
-            fetchData();
+            renderTableFiltered(allLogs.length);
         }
 
         function renderTableFiltered(totalCount) {
-            const query = document.getElementById('search').value.toLowerCase();
+            const query = (document.getElementById('search').value || '').toLowerCase();
 
             const filtered = allLogs.filter(l => {
                 const remarkText = getRemarkText(l.status).toLowerCase();
@@ -1701,7 +1701,7 @@
                     (l.ip_info && l.ip_info.toLowerCase().includes(query)) ||
                     (l.token && l.token.toLowerCase().includes(query)) ||
                     (l.ua && l.ua.toLowerCase().includes(query)) ||
-                    l.status.includes(query) ||
+                    (l.status && String(l.status).includes(query)) ||
                     remarkText.includes(query);
 
                 const matchTime = isWithinTimeRange(l.time);
@@ -1713,12 +1713,11 @@
         }
 
         function renderStats(logs, totalCount) {
-            // 优先使用后端返回的总数 totalCount
             document.getElementById('stat-total').innerText = totalCount !== undefined ? totalCount : logs.length;
             
-            const ips = new Set(logs.map(l => l.ip));
+            const ips = new Set(logs.map(l => l.ip).filter(Boolean));
             document.getElementById('stat-ips').innerText = ips.size;
-            const success = logs.filter(l => l.status === '200').length;
+            const success = logs.filter(l => String(l.status) === '200').length;
             document.getElementById('stat-success').innerText = success;
             document.getElementById('stat-error').innerText = logs.length - success;
         }
@@ -1887,10 +1886,8 @@
             const isMobile = window.innerWidth <= 768;
 
             if (isMobile) {
-                // 清空 PC 端分页条
                 pcPaginationContainer.innerHTML = '';
 
-                // 移动端：按当前 mobileDisplayCount 截取并渲染“加载更多”
                 const displayLogs = logs.slice(0, mobileDisplayCount);
                 
                 tbody.innerHTML = displayLogs.map(l => {
@@ -1948,7 +1945,6 @@
                     `;
                 }).join('');
 
-                // 渲染移动端加载更多按钮
                 if (mobileDisplayCount < logs.length) {
                     mobileLoadMoreContainer.innerHTML = `
                         <div class="mobile-load-more-container">
@@ -1964,10 +1960,8 @@
                 }
 
             } else {
-                // 清空移动端加载更多容器
                 mobileLoadMoreContainer.innerHTML = '';
 
-                // PC 端：利用后端返回的 totalCount 进行服务端分页计算
                 const totalPages = Math.ceil(totalCount / pcPageSize) || 1;
                 if (currentPcPage > totalPages) currentPcPage = totalPages;
                 const pageLogs = logs;
@@ -2004,18 +1998,15 @@
                     `;
                 }).join('');
 
-                // 渲染 PC 端数字分页工具条
                 renderPcPaginationBar(totalPages, totalCount);
             }
         }
 
-        // PC 端切换页码逻辑
         function changePcPage(page) {
             currentPcPage = page;
             fetchData();
         }
 
-        // 渲染 PC 端底部分页控制栏
         function renderPcPaginationBar(totalPages, totalCount) {
             const container = document.getElementById('pc-pagination-container');
             let pagesHtml = '';
@@ -2039,7 +2030,6 @@
             `;
         }
 
-        // 移动端点击“加载更多”逻辑
         function loadMoreMobileLogs(totalCount) {
             mobileDisplayCount += mobileStep;
             if (mobileDisplayCount > totalCount) mobileDisplayCount = totalCount;
