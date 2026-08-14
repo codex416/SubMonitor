@@ -1102,7 +1102,7 @@
 
         // 分页状态控制
         let currentPcPage = 1;
-        const pcPageSize = 25;
+        const pcPageSize = 50;
         let mobileDisplayCount = 20;
         const mobileStep = 20;
 
@@ -1642,15 +1642,20 @@
 
         async function fetchData() {
             try {
-                const res = await fetch('/api/logs.php');
-                allLogs = await res.json();
+                // 使用动态分页请求接口数据
+                const res = await fetch(`/api/logs.php?page=${currentPcPage}&limit=${pcPageSize}`);
+                const responseData = await res.json();
+                
+                // 适配后端返回的结构化对象：{ total, page, limit, data }
+                allLogs = responseData.data || [];
+                const totalCount = responseData.total || 0;
                 
                 const now = new Date();
                 document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
                 
                 renderStats(allLogs);
                 renderAnalyticsCards(allLogs);
-                filterTableData();
+                renderTableFiltered(totalCount);
             } catch (err) {
                 document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
             }
@@ -1681,10 +1686,10 @@
         function filterTableData() {
             currentPcPage = 1; // 筛选条件变动时重置回第1页
             mobileDisplayCount = 20; // 移动端重置初始加载数
-            renderTableFiltered();
+            fetchData();
         }
 
-        function renderTableFiltered() {
+        function renderTableFiltered(totalCount) {
             const query = document.getElementById('search').value.toLowerCase();
 
             const filtered = allLogs.filter(l => {
@@ -1701,7 +1706,7 @@
                 return matchSearch && matchTime;
             });
 
-            renderTable(filtered);
+            renderTable(filtered, totalCount);
         }
 
         function renderStats(logs) {
@@ -1862,7 +1867,7 @@
             }).join('');
         }
 
-        function renderTable(logs) {
+        function renderTable(logs, totalCount) {
             const tbody = document.getElementById('log-table');
             const pcPaginationContainer = document.getElementById('pc-pagination-container');
             const mobileLoadMoreContainer = document.getElementById('mobile-load-more-container');
@@ -1957,11 +1962,10 @@
                 // 清空移动端加载更多容器
                 mobileLoadMoreContainer.innerHTML = '';
 
-                // PC 端：数字分页计算
-                const totalPages = Math.ceil(logs.length / pcPageSize) || 1;
+                // PC 端：利用后端返回的 totalCount 进行服务端分页计算
+                const totalPages = Math.ceil(totalCount / pcPageSize) || 1;
                 if (currentPcPage > totalPages) currentPcPage = totalPages;
-                const startIndex = (currentPcPage - 1) * pcPageSize;
-                const pageLogs = logs.slice(startIndex, startIndex + pcPageSize);
+                const pageLogs = logs;
 
                 tbody.innerHTML = pageLogs.map(l => {
                     const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
@@ -1996,14 +2000,14 @@
                 }).join('');
 
                 // 渲染 PC 端数字分页工具条
-                renderPcPaginationBar(totalPages, logs.length);
+                renderPcPaginationBar(totalPages, totalCount);
             }
         }
 
         // PC 端切换页码逻辑
         function changePcPage(page) {
             currentPcPage = page;
-            renderTableFiltered();
+            fetchData();
         }
 
         // 渲染 PC 端底部分页控制栏
@@ -2034,7 +2038,7 @@
         function loadMoreMobileLogs(totalCount) {
             mobileDisplayCount += mobileStep;
             if (mobileDisplayCount > totalCount) mobileDisplayCount = totalCount;
-            renderTableFiltered();
+            filterTableData();
         }
 
         function initializeApp() {
@@ -2046,7 +2050,7 @@
         }
 
         window.addEventListener('resize', () => {
-            if (allLogs.length > 0) renderTableFiltered();
+            if (allLogs.length > 0) fetchData();
         });
     </script>
 </body>
