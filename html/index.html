@@ -1173,7 +1173,7 @@
             formData.append('new_password', newPassword);
 
             try {
-                const res = await fetch('api/change_password.php', {
+                const res = await fetch('/api/change_password.php', {
                     method: 'POST',
                     body: formData
                 });
@@ -1182,7 +1182,7 @@
                 if (data.code === 200 || data.status === 'success') {
                     input.value = '';
                     setTimeout(() => {
-                        window.location.href = 'login.html';
+                        window.location.href = '/login.html';
                     }, 1500);
                 }
             } catch (err) {
