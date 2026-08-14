@@ -1652,6 +1652,8 @@
 
         async function fetchData() {
             try {
+                await fetchBlacklistRules();
+
                 const isMobile = window.innerWidth <= 768;
                 const searchVal = (document.getElementById('search').value || '').trim();
                 const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
@@ -1861,13 +1863,18 @@
 
             const isMobile = window.innerWidth <= 768;
 
+            const isIpBanned = (ip) => ip && ip !== '-' && (currentBlData.ip || []).includes(ip);
+            const isTokenBanned = (token) => token && token !== '-' && (currentBlData.token || []).includes(token);
+            const isUaBanned = (ua) => ua && ua !== '-' && (currentBlData.ua || []).some(bannedUa => ua.includes(bannedUa));
+
             if (isMobile) {
                 pcPaginationContainer.innerHTML = '';
 
                 tbody.innerHTML = logs.map(l => {
                     const hasUa = l.ua && l.ua !== '-';
+                    const uaBannedFlag = isUaBanned(l.ua) ? `<span style="color:#dc2626; font-weight:bold; margin-right:4px;">[已封禁 UA]</span>` : '';
                     const uaHtml = hasUa
-                        ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${escapeHtml(l.ua)}</div>`
+                        ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${uaBannedFlag}${escapeHtml(l.ua)}</div>`
                         : '';
 
                     const infoId = 'm-geo-' + Math.random().toString(36).substring(2, 9);
@@ -1877,6 +1884,9 @@
                             if (el) fetchAsyncIpGeo(l.ip, el);
                         }, 50);
                     }
+
+                    const ipBanned = isIpBanned(l.ip);
+                    const tokenBanned = isTokenBanned(l.token);
 
                     return `
                         <tr class="m-card">
@@ -1892,9 +1902,13 @@
                                     <div class="m-row">
                                         <div class="m-label">IP</div>
                                         <div class="m-value">
-                                            <div style="display:flex; align-items:center; gap:4px;">
+                                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+                                                ${ipBanned ? '<span class="badge badge-403" style="font-size:0.7rem; padding:1px 5px;">已封禁 IP</span>' : ''}
                                                 ${renderPillBox(l.ip, 'IP')}
-                                                ${l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封IP</button>` : ''}
+                                                ${l.ip && l.ip !== '-' ? (ipBanned 
+                                                    ? `<button class="btn-ban" style="opacity:0.5; cursor:not-allowed;" disabled>已封禁</button>`
+                                                    : `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封IP</button>`
+                                                ) : ''}
                                             </div>
                                             <div id="${infoId}" class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                                         </div>
@@ -1902,9 +1916,13 @@
                                     <div class="m-row">
                                         <div class="m-label">Token</div>
                                         <div class="m-value">
-                                            <div style="display:flex; align-items:center; gap:4px;">
+                                            <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
+                                                ${tokenBanned ? '<span class="badge badge-403" style="font-size:0.7rem; padding:1px 5px;">已封禁 Token</span>' : ''}
                                                 ${renderPillBox(l.token, 'Token')}
-                                                ${l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封Token</button>` : ''}
+                                                ${l.token && l.token !== '-' ? (tokenBanned 
+                                                    ? `<button class="btn-ban" style="opacity:0.5; cursor:not-allowed;" disabled>已封禁</button>`
+                                                    : `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封Token</button>`
+                                                ) : ''}
                                             </div>
                                         </div>
                                     </div>
@@ -1944,23 +1962,49 @@
                         }, 50);
                     }
 
+                    const ipBanned = isIpBanned(l.ip);
+                    const tokenBanned = isTokenBanned(l.token);
+                    const uaBanned = isUaBanned(l.ua);
+
+                    let remarkHtml = getRemark(l.status);
+                    if (ipBanned || tokenBanned || uaBanned) {
+                        const bannedTags = [];
+                        if (ipBanned) bannedTags.push('IP');
+                        if (tokenBanned) bannedTags.push('Token');
+                        if (uaBanned) bannedTags.push('UA');
+                        remarkHtml += `<div style="margin-top:2px;"><span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁 ${bannedTags.join('/')}</span></div>`;
+                    }
+
                     return `
                         <tr>
                             <td style="color:#334155">${escapeHtml(l.time)}</td>
                             <td>
-                                ${renderPillBox(l.ip, 'IP')}
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                    ${renderPillBox(l.ip, 'IP')}
+                                    ${ipBanned ? '<span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁</span>' : ''}
+                                </div>
                                 <div id="${infoId}" class="ip-sub">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                             </td>
                             <td>
-                                ${renderPillBox(l.token, 'Token')}
+                                <div style="display:flex; align-items:center; gap:4px;">
+                                    ${renderPillBox(l.token, 'Token')}
+                                    ${tokenBanned ? '<span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁</span>' : ''}
+                                </div>
                             </td>
                             <td>${getStatusBadge(l.status)}</td>
-                            <td>${getRemark(l.status)}</td>
-                            <td class="ua-text" title="${escapeHtml(l.ua)}">${escapeHtml(l.ua)}</td>
+                            <td>${remarkHtml}</td>
+                            <td class="ua-text" title="${escapeHtml(l.ua)}">
+                                ${uaBanned ? '<span style="color:#dc2626; font-weight:600; margin-right:4px;">[已封禁UA]</span>' : ''}
+                                ${escapeHtml(l.ua)}
+                            </td>
                             <td style="text-align:center;">
                                 <div class="ban-actions" style="justify-content:center;">
-                                    ${l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封 IP</button>` : ''}
-                                    ${l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封 Token</button>` : ''}
+                                    ${l.ip && l.ip !== '-' ? (ipBanned 
+                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 IP</button>` 
+                                        : `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封 IP</button>`) : ''}
+                                    ${l.token && l.token !== '-' ? (tokenBanned 
+                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 Token</button>` 
+                                        : `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封 Token</button>`) : ''}
                                 </div>
                             </td>
                         </tr>
