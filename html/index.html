@@ -1532,10 +1532,10 @@
 
         function getRemarkText(code) {
             switch(code) {
-                case '200': return '成功拉取订阅';
+                case '200': return '拉取订阅';
                 case '400': return '伪造请求';
-                case '403': return 'Token过期';
-                case '404': return '订阅路径错误';
+                case '403': return '异常用户';
+                case '404': return '路径错误';
                 case '429': return '请求过多';
                 case '500':
                 case '502': return '服务异常';
@@ -1545,10 +1545,10 @@
 
         function getRemark(code) {
             switch(code) {
-                case '200': return '<span class="remark-text" style="color:#16a34a;">成功拉取订阅</span>';
+                case '200': return '<span class="remark-text" style="color:#16a34a;">拉取订阅</span>';
                 case '400': return '<span class="remark-text" style="color:#b45309;">伪造请求</span>';
-                case '403': return '<span class="remark-text" style="color:#dc2626;">Token过期</span>';
-                case '404': return '<span class="remark-text" style="color:#6b21a8;">订阅路径错误</span>';
+                case '403': return '<span class="remark-text" style="color:#dc2626;">异常用户</span>';
+                case '404': return '<span class="remark-text" style="color:#6b21a8;">路径错误</span>';
                 case '429': return '<span class="remark-text" style="color:#ea580c;">请求过多</span>';
                 case '500':
                 case '502': return '<span class="remark-text" style="color:#9f1239;">服务异常</span>';
