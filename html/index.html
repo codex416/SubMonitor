@@ -1967,13 +1967,6 @@
                     const uaBanned = isUaBanned(l.ua);
 
                     let remarkHtml = getRemark(l.status);
-                    if (ipBanned || tokenBanned || uaBanned) {
-                        const bannedTags = [];
-                        if (ipBanned) bannedTags.push('IP');
-                        if (tokenBanned) bannedTags.push('Token');
-                        if (uaBanned) bannedTags.push('UA');
-                        remarkHtml += `<div style="margin-top:2px;"><span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁 ${bannedTags.join('/')}</span></div>`;
-                    }
 
                     return `
                         <tr>
