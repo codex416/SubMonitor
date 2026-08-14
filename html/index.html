@@ -330,7 +330,7 @@
             background: #fef2f2;
             color: var(--primary-red);
             border: 1px solid #fecaca;
-            padding: 3px 8px;
+            padding: 3px 7px;
             border-radius: 6px;
             font-size: 0.72rem;
             font-weight: 600;
@@ -340,8 +340,6 @@
             display: inline-flex;
             align-items: center;
             gap: 2px;
-            margin-left: 4px;
-            vertical-align: middle;
         }
 
         .btn-ban:hover {
@@ -950,10 +948,11 @@
                             <th>状态</th>
                             <th>备注</th>
                             <th>客户端 (User-Agent)</th>
+                            <th style="text-align:center;">快速操作</th>
                         </tr>
                     </thead>
                     <tbody id="log-table">
-                        <tr><td colspan="6" class="empty-state">加载数据中...</td></tr>
+                        <tr><td colspan="7" class="empty-state">加载数据中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1679,7 +1678,7 @@
                 renderAnalyticsCards(allLogs);
                 renderTableFiltered(totalCount);
             } catch (err) {
-                document.getElementById('log-table').innerHTML = '<tr><td colspan="6" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+                document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
             }
         }
 
@@ -1854,7 +1853,7 @@
             const mobileLoadMoreContainer = document.getElementById('mobile-load-more-container');
 
             if (logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">未查询到符合条件的日志记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未查询到符合条件的日志记录</td></tr>';
                 pcPaginationContainer.innerHTML = '';
                 mobileLoadMoreContainer.innerHTML = '';
                 return;
@@ -1893,13 +1892,21 @@
                                     <div class="m-row">
                                         <div class="m-label">IP</div>
                                         <div class="m-value">
-                                            ${renderPillBox(l.ip, 'IP')}
+                                            <div style="display:flex; align-items:center; gap:4px;">
+                                                ${renderPillBox(l.ip, 'IP')}
+                                                ${l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封IP</button>` : ''}
+                                            </div>
                                             <div id="${infoId}" class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
                                         </div>
                                     </div>
                                     <div class="m-row">
                                         <div class="m-label">Token</div>
-                                        <div class="m-value">${renderPillBox(l.token, 'Token')}</div>
+                                        <div class="m-value">
+                                            <div style="display:flex; align-items:center; gap:4px;">
+                                                ${renderPillBox(l.token, 'Token')}
+                                                ${l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封Token</button>` : ''}
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                                 ${uaHtml}
@@ -1950,6 +1957,12 @@
                             <td>${getStatusBadge(l.status)}</td>
                             <td>${getRemark(l.status)}</td>
                             <td class="ua-text" title="${escapeHtml(l.ua)}">${escapeHtml(l.ua)}</td>
+                            <td style="text-align:center;">
+                                <div class="ban-actions" style="justify-content:center;">
+                                    ${l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封 IP</button>` : ''}
+                                    ${l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封 Token</button>` : ''}
+                                </div>
+                            </td>
                         </tr>
                     `;
                 }).join('');
