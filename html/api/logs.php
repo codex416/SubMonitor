@@ -38,6 +38,9 @@ $cacheFile = '/opt/SubMonitor/rules/ip_cache.json';
 $ipCache = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
 $cacheChanged = false;
 
+/**
+ * 快速获取 IP 归属地及运营商信息
+ */
 function getIpInfoFast($ip, &$ipCache, &$cacheChanged) {
     if ($ip === '127.0.0.1' || $ip === '::1' || strpos($ip, '192.168.') === 0 || strpos($ip, '10.') === 0 || strpos($ip, '172.') === 0) {
         return '本地/局域网';
@@ -53,7 +56,11 @@ function getIpInfoFast($ip, &$ipCache, &$cacheChanged) {
     if ($res) {
         $data = json_decode($res, true);
         if ($data && $data['status'] === 'success') {
-            $info = trim(($data['country'] ?? '') . ' ' . ($data['regionName'] ?? '') . ' ' . ($data['city'] ?? ''));
+            $location = trim(($data['country'] ?? '') . ' ' . ($data['regionName'] ?? '') . ' ' . ($data['city'] ?? ''));
+            $isp = $data['isp'] ?? ($data['org'] ?? '');
+            
+            // 拼接地理位置与运营商/组织名称
+            $info = $isp ? trim($location . ' (' . $isp . ')') : $location;
         }
     }
     
@@ -83,7 +90,7 @@ foreach ($lines as $line) {
             }
         }
 
-        // 时间范围过滤（补全后端时间筛选）
+        // 时间范围过滤
         if ($startTime !== '' || $endTime !== '') {
             $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $matches[2]);
             $logFormatted = $dt ? $dt->setTimezone($targetTimeZone)->format('Y-m-d H:i:s') : '';
@@ -97,9 +104,7 @@ foreach ($lines as $line) {
     }
 }
 
-// ==========================================
-// 💡【核心改动】计算全局统计数据（切片前进行全局计算）
-// ==========================================
+// 2. 全局统计数据计算（切片前计算）
 $total = count($validLines);
 $globalIps = [];
 $totalSuccess = 0;
@@ -120,14 +125,14 @@ foreach ($validLines as $line) {
 }
 $totalIps = count($globalIps);
 
-// 2. 分页切片
+// 3. 分页切片
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $limit = isset($_GET['limit']) ? max(1, intval($_GET['limit'])) : 50;
 $pagedLines = array_slice($validLines, ($page - 1) * $limit, $limit);
 
 $result = [];
 
-// 3. 解析当前页数据
+// 4. 解析当前页数据
 foreach ($pagedLines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
         $ip = $matches[1];
@@ -177,7 +182,7 @@ if ($cacheChanged) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-// 返回带有全局统计指标的 JSON
+// 5. 返回带有全局统计指标的 JSON
 echo json_encode([
     'total'         => $total,
     'total_ips'     => $totalIps,      // 全局独立 IP 数
