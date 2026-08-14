@@ -1641,28 +1641,28 @@
         }
 
         async function fetchData() {
-    try {
-        // 判断是否为移动端，移动端动态传入 mobileDisplayCount 作为 limit
-        const isMobile = window.innerWidth <= 768;
-        const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
+            try {
+                // 判断是否为移动端，移动端动态传入 mobileDisplayCount 作为 limit
+                const isMobile = window.innerWidth <= 768;
+                const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
 
-        const res = await fetch(`/api/logs.php?page=${currentPcPage}&limit=${fetchLimit}`);
-        const responseData = await res.json();
-        
-        allLogs = responseData.data || [];
-        const totalCount = responseData.total || 0;
-        
-        const now = new Date();
-        document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
-        
-        // 将真正的 totalCount 传递给 renderStats
-        renderStats(allLogs, totalCount);
-        renderAnalyticsCards(allLogs);
-        renderTableFiltered(totalCount);
-    } catch (err) {
-        document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
-    }
-}
+                const res = await fetch(`/api/logs.php?page=${currentPcPage}&limit=${fetchLimit}`);
+                const responseData = await res.json();
+                
+                allLogs = responseData.data || [];
+                const totalCount = responseData.total || 0;
+                
+                const now = new Date();
+                document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
+                
+                // 将真正的 totalCount 传递给 renderStats
+                renderStats(allLogs, totalCount);
+                renderAnalyticsCards(allLogs);
+                renderTableFiltered(totalCount);
+            } catch (err) {
+                document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+            }
+        }
 
         function isWithinTimeRange(logTimeStr) {
             if (!lockedStartTime && !lockedEndTime) return true;
@@ -1713,15 +1713,15 @@
         }
 
         function renderStats(logs, totalCount) {
-    // 优先使用后端返回的总数 totalCount
-    document.getElementById('stat-total').innerText = totalCount !== undefined ? totalCount : logs.length;
-    
-    const ips = new Set(logs.map(l => l.ip));
-    document.getElementById('stat-ips').innerText = ips.size;
-    const success = logs.filter(l => l.status === '200').length;
-    document.getElementById('stat-success').innerText = success;
-    document.getElementById('stat-error').innerText = logs.length - success;
-}
+            // 优先使用后端返回的总数 totalCount
+            document.getElementById('stat-total').innerText = totalCount !== undefined ? totalCount : logs.length;
+            
+            const ips = new Set(logs.map(l => l.ip));
+            document.getElementById('stat-ips').innerText = ips.size;
+            const success = logs.filter(l => l.status === '200').length;
+            document.getElementById('stat-success').innerText = success;
+            document.getElementById('stat-error').innerText = logs.length - success;
+        }
 
         function renderAnalyticsCards(logs) {
             const todayStr = dateToYMD(new Date());
