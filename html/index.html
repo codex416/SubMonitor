@@ -1672,7 +1672,7 @@
                 const now = new Date();
                 document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
                 
-                renderStats(allLogs, totalCount);
+                renderStats(allLogs, responseData);
                 renderAnalyticsCards(allLogs);
                 renderTableFiltered(totalCount);
             } catch (err) {
@@ -1724,14 +1724,21 @@
             renderTable(filtered, totalCount);
         }
 
-        function renderStats(logs, totalCount) {
-            document.getElementById('stat-total').innerText = totalCount !== undefined ? totalCount : logs.length;
-            
-            const ips = new Set(logs.map(l => l.ip).filter(Boolean));
-            document.getElementById('stat-ips').innerText = ips.size;
-            const success = logs.filter(l => String(l.status) === '200').length;
-            document.getElementById('stat-success').innerText = success;
-            document.getElementById('stat-error').innerText = logs.length - success;
+        function renderStats(logs, responseData) {
+            // 若后端返回了全局统计字段，直接展示全局统计，否则展示当前分页准确数据
+            if (responseData && responseData.total_ips !== undefined) {
+                document.getElementById('stat-total').innerText = responseData.total || 0;
+                document.getElementById('stat-ips').innerText = responseData.total_ips || 0;
+                document.getElementById('stat-success').innerText = responseData.total_success || 0;
+                document.getElementById('stat-error').innerText = responseData.total_error || 0;
+            } else {
+                document.getElementById('stat-total').innerText = logs.length;
+                const ips = new Set(logs.map(l => l.ip).filter(Boolean));
+                document.getElementById('stat-ips').innerText = ips.size;
+                const success = logs.filter(l => String(l.status) === '200').length;
+                document.getElementById('stat-success').innerText = success;
+                document.getElementById('stat-error').innerText = logs.length - success;
+            }
         }
 
         function renderAnalyticsCards(logs) {
