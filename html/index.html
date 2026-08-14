@@ -610,6 +610,70 @@
 
         .empty-state { padding: 40px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
 
+        /* PC 端数字分页工具条样式 */
+        .pagination-bar {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 16px;
+            background: #f8fafc;
+            border-top: 1px solid var(--border);
+            font-size: 0.82rem;
+            color: var(--text-muted);
+        }
+        .pagination-nums {
+            display: flex;
+            gap: 4px;
+            align-items: center;
+        }
+        .page-btn {
+            background: #ffffff;
+            border: 1px solid var(--border);
+            color: var(--text-primary);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .page-btn:hover:not(:disabled) {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background: #f0f6ff;
+        }
+        .page-btn.active {
+            background: var(--primary-blue);
+            color: #ffffff;
+            border-color: var(--primary-blue);
+            font-weight: 600;
+        }
+        .page-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        /* 移动端加载更多按钮样式 */
+        .mobile-load-more-container {
+            padding: 12px;
+            text-align: center;
+            background: transparent;
+            width: 100%;
+        }
+        .btn-load-more {
+            width: 100%;
+            padding: 10px;
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            color: var(--primary-blue);
+            font-size: 0.85rem;
+            font-weight: 600;
+            cursor: pointer;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.02);
+        }
+        .btn-load-more:hover { background: #f0f6ff; }
+        .btn-load-more:disabled { color: var(--text-muted); background: #f1f5f9; cursor: not-allowed; }
+
         @media (max-width: 768px) {
             .control-panel {
                 border-radius: 12px;
@@ -896,7 +960,11 @@
                     </tbody>
                 </table>
             </div>
+            <!-- PC 端分页条容器 -->
+            <div id="pc-pagination-container"></div>
         </div>
+        <!-- 移动端加载更多容器 -->
+        <div id="mobile-load-more-container"></div>
     </div>
 
     <!-- Time Modal -->
@@ -1031,6 +1099,12 @@
         let lockedEndTime = '';   
         let currentBlData = { ip: [], token: [], ua: [] };
         let activeBlTab = 'ip';
+
+        // 分页状态控制
+        let currentPcPage = 1;
+        const pcPageSize = 25;
+        let mobileDisplayCount = 20;
+        const mobileStep = 20;
 
         function padZero(n) { return n.toString().padStart(2, '0'); }
 
@@ -1605,6 +1679,12 @@
         }
 
         function filterTableData() {
+            currentPcPage = 1; // 筛选条件变动时重置回第1页
+            mobileDisplayCount = 20; // 移动端重置初始加载数
+            renderTableFiltered();
+        }
+
+        function renderTableFiltered() {
             const query = document.getElementById('search').value.toLowerCase();
 
             const filtered = allLogs.filter(l => {
@@ -1784,15 +1864,26 @@
 
         function renderTable(logs) {
             const tbody = document.getElementById('log-table');
+            const pcPaginationContainer = document.getElementById('pc-pagination-container');
+            const mobileLoadMoreContainer = document.getElementById('mobile-load-more-container');
+
             if (logs.length === 0) {
                 tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未查询到符合条件的日志记录</td></tr>';
+                pcPaginationContainer.innerHTML = '';
+                mobileLoadMoreContainer.innerHTML = '';
                 return;
             }
 
             const isMobile = window.innerWidth <= 768;
 
             if (isMobile) {
-                tbody.innerHTML = logs.map(l => {
+                // 清空 PC 端分页条
+                pcPaginationContainer.innerHTML = '';
+
+                // 移动端：按当前 mobileDisplayCount 截取并渲染“加载更多”
+                const displayLogs = logs.slice(0, mobileDisplayCount);
+                
+                tbody.innerHTML = displayLogs.map(l => {
                     const hasUa = l.ua && l.ua !== '-';
                     const uaHtml = hasUa
                         ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${escapeHtml(l.ua)}</div>`
@@ -1846,8 +1937,33 @@
                         </tr>
                     `;
                 }).join('');
+
+                // 渲染移动端加载更多按钮
+                if (mobileDisplayCount < logs.length) {
+                    mobileLoadMoreContainer.innerHTML = `
+                        <div class="mobile-load-more-container">
+                            <button class="btn-load-more" onclick="loadMoreMobileLogs(${logs.length})">加载更多 (${mobileDisplayCount}/${logs.length})</button>
+                        </div>
+                    `;
+                } else {
+                    mobileLoadMoreContainer.innerHTML = `
+                        <div class="mobile-load-more-container">
+                            <button class="btn-load-more" disabled>已加载全部 (${logs.length}条)</button>
+                        </div>
+                    `;
+                }
+
             } else {
-                tbody.innerHTML = logs.map(l => {
+                // 清空移动端加载更多容器
+                mobileLoadMoreContainer.innerHTML = '';
+
+                // PC 端：数字分页计算
+                const totalPages = Math.ceil(logs.length / pcPageSize) || 1;
+                if (currentPcPage > totalPages) currentPcPage = totalPages;
+                const startIndex = (currentPcPage - 1) * pcPageSize;
+                const pageLogs = logs.slice(startIndex, startIndex + pcPageSize);
+
+                tbody.innerHTML = pageLogs.map(l => {
                     const banIpBtn = l.ip && l.ip !== '-' ? `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">🚫 封禁 IP</button>` : '';
                     const banTokenBtn = l.token && l.token !== '-' ? `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">🚫 封禁 Token</button>` : '';
 
@@ -1878,7 +1994,47 @@
                         </tr>
                     `;
                 }).join('');
+
+                // 渲染 PC 端数字分页工具条
+                renderPcPaginationBar(totalPages, logs.length);
             }
+        }
+
+        // PC 端切换页码逻辑
+        function changePcPage(page) {
+            currentPcPage = page;
+            renderTableFiltered();
+        }
+
+        // 渲染 PC 端底部分页控制栏
+        function renderPcPaginationBar(totalPages, totalCount) {
+            const container = document.getElementById('pc-pagination-container');
+            let pagesHtml = '';
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPcPage - 2 && i <= currentPcPage + 2)) {
+                    pagesHtml += `<button class="page-btn ${i === currentPcPage ? 'active' : ''}" onclick="changePcPage(${i})">${i}</button>`;
+                } else if (i === currentPcPage - 3 || i === currentPcPage + 3) {
+                    pagesHtml += `<span style="padding:0 4px;">...</span>`;
+                }
+            }
+
+            container.innerHTML = `
+                <div class="pagination-bar">
+                    <div>共 <strong>${totalCount}</strong> 条记录，当前第 <strong>${currentPcPage}/${totalPages}</strong> 页</div>
+                    <div class="pagination-nums">
+                        <button class="page-btn" onclick="changePcPage(${currentPcPage - 1})" ${currentPcPage <= 1 ? 'disabled' : ''}>上一页</button>
+                        ${pagesHtml}
+                        <button class="page-btn" onclick="changePcPage(${currentPcPage + 1})" ${currentPcPage >= totalPages ? 'disabled' : ''}>下一页</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        // 移动端点击“加载更多”逻辑
+        function loadMoreMobileLogs(totalCount) {
+            mobileDisplayCount += mobileStep;
+            if (mobileDisplayCount > totalCount) mobileDisplayCount = totalCount;
+            renderTableFiltered();
         }
 
         function initializeApp() {
@@ -1890,7 +2046,7 @@
         }
 
         window.addEventListener('resize', () => {
-            if (allLogs.length > 0) filterTableData();
+            if (allLogs.length > 0) renderTableFiltered();
         });
     </script>
 </body>
