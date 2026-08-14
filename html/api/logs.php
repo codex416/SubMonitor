@@ -34,6 +34,9 @@ fclose($fp);
 $lines = array_reverse($lines);
 $targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
+// 接收全局搜索参数
+$search = isset($_GET['search']) ? mb_strtolower(trim($_GET['search'])) : '';
+
 // 加载本地 IP 缓存
 $cacheFile = '/opt/SubMonitor/rules/ip_cache.json';
 $ipCache = file_exists($cacheFile) ? json_decode(file_get_contents($cacheFile), true) : [];
@@ -63,7 +66,7 @@ function getIpInfoFast($ip, &$ipCache, &$cacheChanged) {
     return $info;
 }
 
-// 1. 先对所有原始日志行进行正则筛选和过滤（确保 total 计算准确）
+// 1. 全局筛选与搜索词匹配
 $validLines = [];
 foreach ($lines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
@@ -71,24 +74,33 @@ foreach ($lines as $line) {
         $parsedUrl = parse_url($url);
         $path = $parsedUrl['path'] ?? $url;
 
-        # 放行证书和反代相关的 API 请求
+        // 放行证书和反代相关的 API 请求
         if ((strpos($url, '/api/') !== false && strpos($url, 'cert') === false && strpos($url, 'domain') === false) || $path === '/' || $path === '/index.html' || $path === '/login.html' || preg_match('/\.(js|css|ico|png|jpg|html|txt|woff)$/i', $path)) {
             continue;
         }
+
+        // 如果存在搜索词，进行全局匹配 (匹配 IP、URL/Token、状态码、UA)
+        if ($search !== '') {
+            $lineLower = mb_strtolower($line);
+            if (strpos($lineLower, $search) === false) {
+                continue;
+            }
+        }
+
         $validLines[] = $line;
     }
 }
 
 $total = count($validLines);
 
-// 2. 获取分页参数并对有效行进行切片（只取当前页需要的几十行）
+// 2. 分页切片
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
 $limit = isset($_GET['limit']) ? max(1, intval($_GET['limit'])) : 50;
 $pagedLines = array_slice($validLines, ($page - 1) * $limit, $limit);
 
 $result = [];
 
-// 3. 只针对当前页的几十行进行解析和 IP 归属地查询，极大提升性能
+// 3. 解析当前页数据
 foreach ($pagedLines as $line) {
     if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^"]+" (\d{3}) \d+ "([^"]*)" "([^"]*)"/', $line, $matches)) {
         $ip = $matches[1];
@@ -121,7 +133,6 @@ foreach ($pagedLines as $line) {
         $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $timeRaw);
         $formattedTime = $dt ? $dt->setTimezone($targetTimeZone)->format('Y-m-d H:i:s') : $timeRaw;
 
-        // 仅对当前页的 IP 进行查询
         $ipInfo = getIpInfoFast($ip, $ipCache, $cacheChanged);
 
         $result[] = [
@@ -135,12 +146,10 @@ foreach ($pagedLines as $line) {
     }
 }
 
-// 如果缓存有新增内容，统一保存到文件
 if ($cacheChanged) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-// 4. 返回友好的对象结构
 echo json_encode([
     'total' => $total,
     'page'  => $page,
