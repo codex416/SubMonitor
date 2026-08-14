@@ -7,14 +7,8 @@ date_default_timezone_set('Asia/Shanghai');
 
 $logFile = '/opt/SubMonitor/rules/access.log';
 
-if (!file_exists($logFile)) {
-    echo json_encode(['total' => 0, 'page' => 1, 'limit' => 50, 'data' => []], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-$fp = fopen($logFile, 'r');
-if (!$fp) { 
-    echo json_encode(['total' => 0, 'page' => 1, 'limit' => 50, 'data' => []], JSON_UNESCAPED_UNICODE);
+if (!file_exists($logFile) || !($fp = fopen($logFile, 'r'))) {
+    echo json_encode(['total' => 0, 'total_ips' => 0, 'total_success' => 0, 'total_error' => 0, 'page' => 1, 'limit' => 50, 'data' => []], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
@@ -34,8 +28,10 @@ fclose($fp);
 $lines = array_reverse($lines);
 $targetTimeZone = new DateTimeZone('Asia/Shanghai');
 
-// 接收全局搜索参数
+// 接收筛选参数
 $search = isset($_GET['search']) ? mb_strtolower(trim($_GET['search'])) : '';
+$startTime = isset($_GET['start_time']) ? trim($_GET['start_time']) : '';
+$endTime = isset($_GET['end_time']) ? trim($_GET['end_time']) : '';
 
 // 加载本地 IP 缓存
 $cacheFile = '/opt/SubMonitor/rules/ip_cache.json';
@@ -79,7 +75,7 @@ foreach ($lines as $line) {
             continue;
         }
 
-        // 如果存在搜索词，进行全局匹配 (匹配 IP、URL/Token、状态码、UA)
+        // 搜索词过滤
         if ($search !== '') {
             $lineLower = mb_strtolower($line);
             if (strpos($lineLower, $search) === false) {
@@ -87,11 +83,42 @@ foreach ($lines as $line) {
             }
         }
 
+        // 时间范围过滤（补全后端时间筛选）
+        if ($startTime !== '' || $endTime !== '') {
+            $dt = DateTime::createFromFormat('d/M/Y:H:i:s O', $matches[2]);
+            $logFormatted = $dt ? $dt->setTimezone($targetTimeZone)->format('Y-m-d H:i:s') : '';
+            if ($logFormatted) {
+                if ($startTime !== '' && $logFormatted < $startTime) continue;
+                if ($endTime !== '' && $logFormatted > $endTime) continue;
+            }
+        }
+
         $validLines[] = $line;
     }
 }
 
+// ==========================================
+// 💡【核心改动】计算全局统计数据（切片前进行全局计算）
+// ==========================================
 $total = count($validLines);
+$globalIps = [];
+$totalSuccess = 0;
+$totalError = 0;
+
+foreach ($validLines as $line) {
+    if (preg_match('/^(\S+) \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) \S+ HTTP\/[^"]+" (\d{3})/', $line, $m)) {
+        $ip = $m[1];
+        $status = $m[3];
+        
+        $globalIps[$ip] = true;
+        if ($status === '200') {
+            $totalSuccess++;
+        } else {
+            $totalError++;
+        }
+    }
+}
+$totalIps = count($globalIps);
 
 // 2. 分页切片
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -150,10 +177,14 @@ if ($cacheChanged) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
+// 返回带有全局统计指标的 JSON
 echo json_encode([
-    'total' => $total,
-    'page'  => $page,
-    'limit' => $limit,
-    'data'  => $result
+    'total'         => $total,
+    'total_ips'     => $totalIps,      // 全局独立 IP 数
+    'total_success' => $totalSuccess,  // 全局成功数
+    'total_error'   => $totalError,    // 全局异常拦截数
+    'page'          => $page,
+    'limit'         => $limit,
+    'data'          => $result
 ], JSON_UNESCAPED_UNICODE);
 exit;
