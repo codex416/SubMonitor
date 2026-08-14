@@ -1015,7 +1015,7 @@
                             <option value="token">Token</option>
                             <option value="ua">User-Agent</option>
                         </select>
-                        <input type="text" id="bl-input-value" class="search-input" style="flex:1;" placeholder="输入要封禁的目标 (例: 1.2.3.4 或 token_hash)">
+                        <input type="text" id="bl-input-value" class="search-input" style="flex:1;" placeholder="输入要封禁的目标 (例: 1.2.3.4 或 token_hash)" onkeydown="if(event.key==='Enter') submitManualBan()">
                         <button class="btn-primary" style="padding:6px 14px; font-size:0.8rem; flex-shrink:0;" onclick="submitManualBan()">添加封禁</button>
                     </div>
                 </div>
@@ -1049,14 +1049,18 @@
             }
             try {
                 const res = await fetch(`https://ipapi.co/${ip}/json/`);
+                if(!res.ok) throw new Error('Network error');
                 const data = await res.json();
                 const info = [data.country_name, data.region, data.city].filter(Boolean).join(' ') || data.country || '';
                 if (info) {
                     ipGeoCache[ip] = info;
                     element.innerText = info;
-                    element.dataset.fetched = "true";
                 }
-            } catch (e) {}
+            } catch (e) {
+                // Ignore geo fetch errors
+            } finally {
+                element.dataset.fetched = "true";
+            }
         }
 
         (async function checkAuthOnLoad() {
@@ -1534,7 +1538,7 @@
             container.innerHTML = list.map(item => `
                 <div style="display:flex; justify-content:space-between; align-items:center; background:#f8fafc; border:1px solid var(--border); padding:8px 12px; border-radius:8px; font-size:0.8rem;">
                     <span style="font-family:monospace; word-break:break-all; max-width:80%; font-weight:600; color:var(--text-primary);">${escapeHtml(item)}</span>
-                    <button class="btn-unban" onclick="unbanTarget('${activeBlTab}', '${escapeHtml(item)}')">解封</button>
+                    <button class="btn-unban" data-type="${activeBlTab}" data-value="${escapeHtml(item)}" onclick="unbanTarget(this.getAttribute('data-type'), this.getAttribute('data-value'))">解封</button>
                 </div>
             `).join('');
         }
@@ -1588,7 +1592,7 @@
             if (!text || text === '-') return '';
             const safeText = escapeHtml(text);
             const copyIconSvg = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path></svg>`;
-            return `<button class="btn-copy-icon" data-copy="${safeText}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), '${label}')" title="复制 ${label}">${copyIconSvg}</button>`;
+            return `<button class="btn-copy-icon" data-copy="${safeText}" data-label="${escapeHtml(label)}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))" title="复制 ${escapeHtml(label)}">${copyIconSvg}</button>`;
         }
 
         function toggleExpand(el) { el.classList.toggle('expanded'); }
@@ -1643,7 +1647,7 @@
             }
             const safeText = escapeHtml(rawText);
             return `<div class="pill-box" onclick="toggleExpand(this)" title="点击复制内容" style="justify-content: center;">
-                <span onclick="event.stopPropagation(); copyToClipboard('${safeText}', '${label}')">${safeText}</span>
+                <span data-copy="${safeText}" data-label="${escapeHtml(label)}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))">${safeText}</span>
             </div>`;
         }
 
@@ -1679,48 +1683,8 @@
             }
         }
 
-        function isWithinTimeRange(logTimeStr) {
-            if (!logTimeStr) return true;
-            if (!lockedStartTime && !lockedEndTime) return true;
-
-            let logFormatted = logTimeStr;
-            if (logFormatted.length === 16) {
-                logFormatted += ":00";
-            }
-
-            if (lockedStartTime) {
-                let startFormatted = lockedStartTime;
-                if (startFormatted.length === 16) startFormatted += ":00";
-                if (logFormatted < startFormatted) return false;
-            }
-            if (lockedEndTime) {
-                let endFormatted = lockedEndTime;
-                if (endFormatted.length === 16) endFormatted += ":59";
-                if (logFormatted > endFormatted) return false;
-            }
-
-            return true;
-        }
-
         function renderTableFiltered(totalCount) {
-            const query = (document.getElementById('search').value || '').toLowerCase();
-
-            const filtered = allLogs.filter(l => {
-                const remarkText = getRemarkText(l.status).toLowerCase();
-                const matchSearch = !query || 
-                    (l.ip && l.ip.toLowerCase().includes(query)) ||
-                    (l.ip_info && l.ip_info.toLowerCase().includes(query)) ||
-                    (l.token && l.token.toLowerCase().includes(query)) ||
-                    (l.ua && l.ua.toLowerCase().includes(query)) ||
-                    (l.status && String(l.status).includes(query)) ||
-                    remarkText.includes(query);
-
-                const matchTime = isWithinTimeRange(l.time);
-
-                return matchSearch && matchTime;
-            });
-
-            renderTable(filtered, totalCount);
+            renderTable(allLogs, totalCount);
         }
 
         function renderStats(logs, responseData) {
