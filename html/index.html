@@ -950,11 +950,10 @@
                             <th>状态</th>
                             <th>备注</th>
                             <th>客户端 (User-Agent)</th>
-                            <th>操作</th>
                         </tr>
                     </thead>
                     <tbody id="log-table">
-                        <tr><td colspan="7" class="empty-state">加载数据中...</td></tr>
+                        <tr><td colspan="6" class="empty-state">加载数据中...</td></tr>
                     </tbody>
                 </table>
             </div>
@@ -1676,7 +1675,7 @@
                 renderAnalyticsCards(allLogs);
                 renderTableFiltered(totalCount);
             } catch (err) {
-                document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+                document.getElementById('log-table').innerHTML = '<tr><td colspan="6" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
             }
         }
 
@@ -1725,7 +1724,6 @@
         }
 
         function renderStats(logs, responseData) {
-            // 若后端返回了全局统计字段，直接展示全局统计，否则展示当前分页准确数据
             if (responseData && responseData.total_ips !== undefined) {
                 document.getElementById('stat-total').innerText = responseData.total || 0;
                 document.getElementById('stat-ips').innerText = responseData.total_ips || 0;
@@ -1892,7 +1890,7 @@
             const mobileLoadMoreContainer = document.getElementById('mobile-load-more-container');
 
             if (logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未查询到符合条件的日志记录</td></tr>';
+                tbody.innerHTML = '<tr><td colspan="6" class="empty-state">未查询到符合条件的日志记录</td></tr>';
                 pcPaginationContainer.innerHTML = '';
                 mobileLoadMoreContainer.innerHTML = '';
                 return;
@@ -1988,7 +1986,6 @@
                             <td>${getStatusBadge(l.status)}</td>
                             <td>${getRemark(l.status)}</td>
                             <td class="ua-text" title="${escapeHtml(l.ua)}">${escapeHtml(l.ua)}</td>
-                            <td></td>
                         </tr>
                     `;
                 }).join('');
