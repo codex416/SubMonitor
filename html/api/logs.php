@@ -127,10 +127,12 @@ if ($cacheChanged) {
     @file_put_contents($cacheFile, json_encode($ipCache, JSON_UNESCAPED_UNICODE));
 }
 
-// 【新增分页机制】
-$page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
-$limit = isset($_GET['limit']) ? max(1, intval($_GET['limit'])) : 50;
-$result = array_slice($result, ($page - 1) * $limit, $limit);
+// 【优化分页机制】只有在传入分页参数时才进行截取，不传则返回全部
+if (isset($_GET['page']) || isset($_GET['limit'])) {
+    $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
+    $limit = isset($_GET['limit']) ? max(1, intval($_GET['limit'])) : 50;
+    $result = array_slice($result, ($page - 1) * $limit, $limit);
+}
 
 echo json_encode($result, JSON_UNESCAPED_UNICODE);
 exit;
