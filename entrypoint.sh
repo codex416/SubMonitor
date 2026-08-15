@@ -31,7 +31,7 @@ fi
 # acme.sh 放到 /opt/SubMonitor/rules，避免运行数据落到 /root。
 if [ ! -f "$ACME_HOME/acme.sh" ]; then
   echo "[Init] 正在安装 acme.sh..."
-  curl -s https://get.acme.sh | sh -s email=admin@befriends.wiki --home "$ACME_HOME" >/dev/null 2>&1
+  curl -s https://get.acme.sh | sh -s email=admin@qq.com --home "$ACME_HOME" >/dev/null 2>&1
 fi
 
 ACME="$ACME_HOME/acme.sh"
@@ -111,7 +111,7 @@ while true; do
     echo "{"status":"processing","msg":"正在申请 $DOMAIN 证书，请稍候..."}" > "$RULES_DIR/cert_status.json"
 
     "$ACME" --issue -d "$DOMAIN" -w /opt/SubMonitor/html \
-      --accountemail admin@befriends.wiki --force --keylength 2048
+      --accountemail admin@qq.com --force --keylength 2048
 
     if [ $? -eq 0 ]; then
       "$ACME" --install-cert -d "$DOMAIN" \
