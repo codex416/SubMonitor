@@ -5,10 +5,19 @@ header('Content-Type: application/json; charset=utf-8');
 // 配置
 define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 define('SESSION_EXPIRE', 86400);
-define('BIND_CLIENT_INFO', true);
+define('BIND_CLIENT_INFO', false);
 
 // 读取密码
 $currentPassword = file_exists(ADMIN_PASSWORD_FILE) ? trim(file_get_contents(ADMIN_PASSWORD_FILE)) : 'admin';
+
+// 退出登录处理
+if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['logout'])) {
+    session_unset();
+    session_destroy();
+    http_response_code(200);
+    echo json_encode(['code' => 200, 'msg' => '已退出登录'], JSON_UNESCAPED_UNICODE);
+    exit;
+}
 
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
     $inputPassword = trim($_POST['password'] ?? '');
@@ -22,10 +31,10 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
     if ($inputPassword === $currentPassword) {
         $_SESSION['is_logged_in'] = true;
         $_SESSION['login_time'] = time();
-        if (BIND_CLIENT_INFO) {
-            $_SESSION['client_ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
-            $_SESSION['client_ua'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
-        }
+        // 无论是否开启绑定，登录时都记录 IP 和 UA
+        $_SESSION['client_ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
+        $_SESSION['client_ua'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        
         http_response_code(200);
         echo json_encode(['code' => 200, 'msg' => '登录成功'], JSON_UNESCAPED_UNICODE);
         exit;
