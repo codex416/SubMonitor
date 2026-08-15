@@ -107,11 +107,17 @@ if ($action === 'get_upstream') {
 // ✅ 2. 更新域名 + 申请证书
 // ========================================================
 if ($action === 'apply_cert' || $action === 'update_domain') {
-    $d = trim($inputData['domain'] ?? $_POST['domain'] ?? '');
-    if (empty($d)) {
+    $d = strtolower(trim($inputData['domain'] ?? $_POST['domain'] ?? ''));
+    $d = preg_replace('/^https?:\/\//i', '', $d);
+    $d = rtrim($d, '.');
+    if (empty($d) || !preg_match('/^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}$/i', $d)) {
         echo json_encode(['status'=>'error','message'=>'域名不能为空'], JSON_UNESCAPED_UNICODE);
         exit;
     }
+    // 提交新域名时先解除旧的域名锁，申请失败也保持 IP 可访问。
+    @unlink(RULES_DIR.'.domain_locked');
+    @file_put_contents(RULES_DIR.'domain_allow.conf', '');
+    @file_put_contents(RULES_DIR.'domain_lock.conf', 'map $host $domain_locked { default 0; }\n');
     safeWriteFile(RULES_DIR.'domain.conf', $d);
     if (!safeWriteFile(RULES_DIR.'.cert_flag', "{$d}\n")) {
         echo json_encode(['status'=>'error','message'=>'写入证书申请标记失败'], JSON_UNESCAPED_UNICODE);
@@ -129,44 +135,37 @@ if ($action === 'apply_cert' || $action === 'update_domain') {
 // ========================================================
 if ($action === 'cert_status') {
     $certPath = SSL_DIR.'cert.pem';
-    
-    if (file_exists($certPath)) {
-        $pem = @file_get_contents($certPath);
-        if ($pem && preg_match_all('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
-            $leaf = $m[0][0] ?? '';
-            $certData = openssl_x509_parse($leaf);
-            
-            if ($certData) {
-                $validToTime = $certData['validTo_time_t'] ?? time();
-                $valid_to = date('Y-m-d H:i:s', $validToTime);
-                $daysLeft = ceil(($validToTime - time()) / 86400);
-                
-                // 🛠️ 修复点：对颁发机构进行名称映射，将 YR1 规范显示为 Let's Encrypt
-                $rawIssuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'Let\'s Encrypt');
-                if (strpos($rawIssuer, 'YR') !== false || strpos($rawIssuer, 'Let\'s Encrypt') !== false) {
-                    $issuer = 'Let\'s Encrypt';
-                } else {
-                    $issuer = $rawIssuer;
-                }
-                
-                $domain = $certData['subject']['CN'] ?? '';
-                if (empty($domain) && file_exists(RULES_DIR.'domain.conf')) {
-                    $domain = trim(file_get_contents(RULES_DIR.'domain.conf'));
-                }
-                if (empty($domain)) {
-                    $domain = 'example.com';
-                }
+    $requestedDomain = file_exists(RULES_DIR.'domain.conf') ? trim(file_get_contents(RULES_DIR.'domain.conf')) : '';
+    $isFormal = false;
 
-                echo json_encode([
-                    'status'=>'success',
-                    'cert'=>[
-                        'domain'=>$domain,
-                        'issuer'=>$issuer,
-                        'valid_to'=>$valid_to,
-                        'days_left'=>$daysLeft > 0 ? $daysLeft : 0
-                    ]
-                ], JSON_UNESCAPED_UNICODE);
-                exit;
+    if (file_exists($certPath) && $requestedDomain !== '') {
+        $pem = @file_get_contents($certPath);
+        if ($pem && preg_match('/-----BEGIN CERTIFICATE-----.+?-----END CERTIFICATE-----/s', $pem, $m)) {
+            $certData = openssl_x509_parse($m[0]);
+            if ($certData) {
+                $validToTime = $certData['validTo_time_t'] ?? 0;
+                $subjectCn = $certData['subject']['CN'] ?? '';
+                $issuerText = json_encode($certData['issuer'] ?? [], JSON_UNESCAPED_UNICODE);
+                $domainMatch = (strcasecmp($subjectCn, $requestedDomain) === 0);
+                $issuerMatch = preg_match('/Let.s Encrypt|ZeroSSL|Google Trust Services|Buypass/i', $issuerText);
+                $isFormal = $domainMatch && $issuerMatch && $validToTime > time();
+
+                if ($isFormal) {
+                    $daysLeft = ceil(($validToTime - time()) / 86400);
+                    $rawIssuer = $certData['issuer']['CN'] ?? ($certData['issuer']['organizationName'] ?? 'ACME CA');
+                    $issuer = preg_match('/YR|Let.s Encrypt/i', $rawIssuer) ? "Let's Encrypt" : $rawIssuer;
+                    echo json_encode([
+                        'status'=>'success',
+                        'cert'=>[
+                            'domain'=>$requestedDomain,
+                            'issuer'=>$issuer,
+                            'valid_to'=>date('Y-m-d H:i:s', $validToTime),
+                            'days_left'=>$daysLeft > 0 ? $daysLeft : 0,
+                            'locked'=>file_exists(RULES_DIR.'.domain_locked')
+                        ]
+                    ], JSON_UNESCAPED_UNICODE);
+                    exit;
+                }
             }
         }
     }
@@ -177,14 +176,15 @@ if ($action === 'cert_status') {
         if ($certData) {
             echo json_encode([
                 'status'=>'success',
-                'cert'=>$certData['cert'] ?? null,
-                'msg'=>$certData['msg'] ?? ''
+                'cert'=>null,
+                'state'=>$certData['status'] ?? 'processing',
+                'msg'=>$certData['msg'] ?? '证书尚未生成'
             ], JSON_UNESCAPED_UNICODE);
             exit;
         }
     }
 
-    echo json_encode(['status'=>'success','cert'=>null,'msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
+    echo json_encode(['status'=>'success','cert'=>null,'state'=>'none','msg'=>'证书尚未生成'], JSON_UNESCAPED_UNICODE);
     exit;
 }
 
