@@ -1,3 +1,33 @@
+<?php
+session_start();
+define('SESSION_EXPIRE', 86400);
+define('BIND_CLIENT_INFO', false); 
+
+function isAuthorized() {
+    $baseCheck = isset($_SESSION['is_logged_in'])
+        && $_SESSION['is_logged_in'] === true
+        && isset($_SESSION['login_time'])
+        && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+        
+    if (!$baseCheck) return false;
+
+    if (BIND_CLIENT_INFO) {
+        $sessionIp = $_SESSION['client_ip'] ?? $_SESSION['user_ip'] ?? '';
+        $sessionUa = $_SESSION['client_ua'] ?? $_SESSION['user_ua'] ?? '';
+        
+        $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
+        $currentUa = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        
+        return ($sessionIp === $currentIp) && ($sessionUa === $currentUa);
+    }
+    return true;
+}
+
+if (!isAuthorized()) {
+    header('Location: /login.html', true, 302);
+    exit;
+}
+?>
 <!DOCTYPE html>
 <html lang="zh-CN">
 <head>
@@ -21,9 +51,18 @@
             --primary-red: #dc2626;
         }
 
-        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif; }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+        }
 
-        html, body { width: 100%; max-width: 100vw; overflow-x: hidden; }
+        html, body {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: hidden;
+        }
 
         body {
             background-color: var(--bg);
@@ -34,7 +73,12 @@
             min-height: 100vh;
         }
 
-        .container { max-width: 1200px; margin: 0 auto; width: 100%; overflow: hidden; }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+            width: 100%;
+            overflow: hidden;
+        }
 
         .top-bar {
             display: flex;
@@ -82,7 +126,44 @@
             border-color: var(--primary-red);
         }
 
-        .last-update { font-size: 0.75rem; color: var(--text-muted); }
+        .sys-control-btn {
+            background: #ffffff;
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.75rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.15s ease;
+        }
+        .sys-control-btn:hover {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background: transparent;
+        }
+
+        .sys-btn-unified {
+            width: 90px;
+            height: 34px;
+            padding: 0;
+            font-size: 0.8rem;
+            font-weight: 600;
+            border-radius: 8px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-sizing: border-box;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            white-space: nowrap;
+        }
+
+        .last-update {
+            font-size: 0.75rem;
+            color: var(--text-muted);
+        }
 
         .analytics-grid {
             display: grid;
@@ -92,7 +173,9 @@
         }
 
         @media (max-width: 640px) {
-            .analytics-grid { grid-template-columns: 1fr; }
+            .analytics-grid {
+                grid-template-columns: 1fr;
+            }
         }
 
         .analytics-card {
@@ -130,8 +213,13 @@
             padding-right: 4px;
         }
 
-        .analytics-list::-webkit-scrollbar { width: 4px; }
-        .analytics-list::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 4px; }
+        .analytics-list::-webkit-scrollbar {
+            width: 4px;
+        }
+        .analytics-list::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
 
         .analytics-item {
             display: flex;
@@ -142,7 +230,9 @@
             border-bottom: 1px solid #f8fafc;
         }
 
-        .analytics-item:last-child { border-bottom: none; }
+        .analytics-item:last-child {
+            border-bottom: none;
+        }
 
         .item-left {
             display: flex;
@@ -212,7 +302,9 @@
         }
 
         @media (max-width: 640px) {
-            .stats-grid { grid-template-columns: repeat(2, 1fr); }
+            .stats-grid {
+                grid-template-columns: repeat(2, 1fr);
+            }
         }
 
         .stat-card {
@@ -223,13 +315,32 @@
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
 
-        .stat-label { font-size: 0.75rem; font-weight: 600; color: var(--text-muted); margin-bottom: 6px; }
-        .stat-number { font-size: 1.4rem; font-weight: 700; }
-        .stat-number.blue { color: var(--primary-blue); }
-        .stat-number.green { color: var(--primary-green); }
-        .stat-number.red { color: var(--primary-red); }
+        .stat-label {
+            font-size: 0.75rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            margin-bottom: 6px;
+        }
+        .stat-number {
+            font-size: 1.4rem;
+            font-weight: 700;
+        }
+        .stat-number.blue {
+            color: var(--primary-blue);
+        }
+        .stat-number.green {
+            color: var(--primary-green);
+        }
+        .stat-number.red {
+            color: var(--primary-red);
+        }
 
-        .section-header { font-size: 1rem; font-weight: 700; color: #0f172a; margin-bottom: 12px; }
+        .section-header {
+            font-size: 1rem;
+            font-weight: 700;
+            color: #0f172a;
+            margin-bottom: 12px;
+        }
 
         .control-panel {
             background: var(--card-bg);
@@ -263,7 +374,10 @@
             color: var(--text-primary);
         }
 
-        .search-input:focus { border-color: var(--primary-blue); background: #fff; }
+        .search-input:focus {
+            border-color: var(--primary-blue);
+            background: #fff;
+        }
 
         .time-trigger-btn {
             background: #ffffff;
@@ -278,6 +392,12 @@
             gap: 6px;
             transition: all 0.15s ease;
             white-space: nowrap;
+            max-width: 100%;
+            overflow: hidden;
+        }
+
+        .time-trigger-btn > span:first-child {
+            flex-shrink: 0;
         }
 
         .time-trigger-btn:hover {
@@ -286,7 +406,14 @@
             color: var(--primary-blue);
         }
 
-        .time-trigger-btn .tag { font-weight: 600; color: var(--primary-blue); }
+        .time-trigger-btn .tag {
+            font-weight: 600;
+            color: var(--primary-blue);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+            min-width: 0;
+        }
 
         .btn-group {
             display: flex;
@@ -309,7 +436,9 @@
             white-space: nowrap;
         }
 
-        .btn:hover { background: #e2e8f0; }
+        .btn:hover {
+            background: #e2e8f0;
+        }
 
         .btn-quick {
             background: #ffffff;
@@ -375,7 +504,10 @@
 
         .modal-overlay {
             position: fixed;
-            top: 0; left: 0; width: 100%; height: 100%;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
             background: rgba(15, 23, 42, 0.45);
             backdrop-filter: blur(6px);
             display: none;
@@ -385,7 +517,9 @@
             padding: 16px;
         }
 
-        .modal-overlay.active { display: flex; }
+        .modal-overlay.active {
+            display: flex;
+        }
 
         .modal-card {
             background: #ffffff;
@@ -400,15 +534,37 @@
         }
 
         @keyframes modalFadeIn {
-            from { opacity: 0; transform: scale(0.96) translateY(8px); }
-            to { opacity: 1; transform: scale(1) translateY(0); }
+            from {
+                opacity: 0;
+                transform: scale(0.96) translateY(8px);
+            }
+            to {
+                opacity: 1;
+                transform: scale(1) translateY(0);
+            }
         }
 
-        .modal-header { font-size: 1.05rem; font-weight: 700; color: var(--text-primary); margin-bottom: 16px; }
+        .modal-header {
+            font-size: 1.05rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 16px;
+        }
 
-        .modal-body { display: flex; flex-direction: column; gap: 16px; margin-bottom: 20px; width: 100%; }
+        .modal-body {
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+            margin-bottom: 20px;
+            width: 100%;
+        }
 
-        .input-group { display: flex; flex-direction: column; gap: 6px; width: 100%; }
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+            width: 100%;
+        }
 
         .input-label-row {
             display: flex;
@@ -416,7 +572,11 @@
             align-items: center;
         }
 
-        .input-label { font-size: 0.78rem; font-weight: 600; color: var(--text-muted); }
+        .input-label {
+            font-size: 0.78rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
 
         .fill-helper-btn {
             font-size: 0.72rem;
@@ -426,7 +586,9 @@
             cursor: pointer;
             font-weight: 500;
         }
-        .fill-helper-btn:hover { text-decoration: underline; }
+        .fill-helper-btn:hover {
+            text-decoration: underline;
+        }
 
         .picker-combo-row {
             display: flex;
@@ -465,7 +627,11 @@
             background: #fff;
         }
 
-        .modal-footer { display: flex; justify-content: flex-end; gap: 10px; }
+        .modal-footer {
+            display: flex;
+            justify-content: flex-end;
+            gap: 10px;
+        }
 
         .btn-primary {
             background: var(--primary-blue);
@@ -479,7 +645,9 @@
             transition: background 0.15s ease;
         }
 
-        .btn-primary:hover { background: #3730a3; }
+        .btn-primary:hover {
+            background: #3730a3;
+        }
 
         .table-card {
             background: var(--card-bg);
@@ -490,9 +658,17 @@
             width: 100%;
         }
 
-        .table-wrapper { overflow-x: auto; width: 100%; }
+        .table-wrapper {
+            overflow-x: auto;
+            width: 100%;
+        }
 
-        table { width: 100%; border-collapse: collapse; text-align: left; font-size: 0.85rem; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            text-align: left;
+            font-size: 0.85rem;
+        }
 
         th {
             background: #f8fafc;
@@ -504,9 +680,16 @@
             white-space: nowrap;
         }
 
-        td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; white-space: nowrap; }
-        tr:last-child td { border-bottom: none; }
-        tr:hover { background-color: #f8fafc; }
+        td {
+            padding: 12px 16px;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        tr:last-child td {
+            border-bottom: none;
+        }
+        tr:hover {
+            background-color: #f8fafc;
+        }
 
         .pill-box {
             display: inline-flex;
@@ -559,8 +742,15 @@
             flex-shrink: 0;
         }
 
-        .btn-copy-icon:hover { color: var(--primary-blue); background: #e2e8f0; }
-        .btn-copy-icon svg { width: 13px; height: 13px; stroke-width: 2; }
+        .btn-copy-icon:hover {
+            color: var(--primary-blue);
+            background: #e2e8f0;
+        }
+        .btn-copy-icon svg {
+            width: 13px;
+            height: 13px;
+            stroke-width: 2;
+        }
 
         .ip-sub {
             font-size: 0.73rem;
@@ -595,26 +785,35 @@
         .badge-500 { background: #fecdd3; color: #9f1239; }
         .badge-other { background: #e2e8f0; color: #475569; }
 
-        .remark-text { font-size: 0.8rem; font-weight: 500; flex-shrink: 0; }
-
-        .ua-text {
-            max-width: 220px;
-            overflow: hidden;
-            text-overflow: ellipsis;
+        .remark-text {
+            font-size: 0.8rem;
+            font-weight: 500;
+            flex-shrink: 0;
             white-space: nowrap;
-            color: var(--text-muted);
-            font-size: 0.78rem;
         }
 
-        .empty-state { padding: 40px; text-align: center; color: var(--text-muted); font-size: 0.85rem; }
+        .ua-text {
+            max-width: 280px;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            word-break: break-all;
+            line-height: 1.4;
+        }
+
+        .empty-state {
+            padding: 40px;
+            text-align: center;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
 
         .pagination-bar {
             display: flex;
             justify-content: space-between;
             align-items: center;
             padding: 12px 16px;
-            background: #f8fafc;
-            border-top: 1px solid var(--border);
+            background: transparent;
+            border-top: 0;
             font-size: 0.82rem;
             color: var(--text-muted);
         }
@@ -649,6 +848,14 @@
             cursor: not-allowed;
         }
 
+
+        .analytics-page-ellipsis { padding: 0 2px; color: var(--text-muted); }
+        @media (max-width: 640px) {
+            .analytics-pagination-bar { font-size: 0.68rem; }
+            .analytics-pagination-nums { gap: 3px; }
+            .analytics-page-btn { min-width: 26px; padding: 3px 6px; }
+        }
+
         .mobile-load-more-container {
             padding: 12px;
             text-align: center;
@@ -667,17 +874,33 @@
             cursor: pointer;
             box-shadow: 0 1px 2px rgba(0,0,0,0.02);
         }
-        .btn-load-more:hover { background: #f0f6ff; }
-        .btn-load-more:disabled { color: var(--text-muted); background: #f1f5f9; cursor: not-allowed; }
+        .btn-load-more:hover {
+            background: #f0f6ff;
+        }
+        .btn-load-more:disabled {
+            color: var(--text-muted);
+            background: #f1f5f9;
+            cursor: not-allowed;
+        }
 
         @media (max-width: 768px) {
+            .brand-title {
+                cursor: pointer;
+            }
+            .sys-control-btn {
+                display: none;
+            }
+
             .control-panel {
                 border-radius: 12px;
                 margin-bottom: 12px;
                 border-bottom: 1px solid var(--border);
             }
 
-            .control-row { flex-direction: column; align-items: stretch; }
+            .control-row {
+                flex-direction: column;
+                align-items: stretch;
+            }
 
             .btn-group {
                 overflow-x: auto;
@@ -688,15 +911,38 @@
                 flex-wrap: nowrap;
             }
 
-            .time-trigger-btn { width: 100%; justify-content: space-between; }
+            .time-trigger-btn {
+                width: 100%;
+                justify-content: space-between;
+            }
 
-            .table-card { background: transparent; border: none; box-shadow: none; overflow: hidden; width: 100%; }
-            .table-wrapper { overflow: hidden; width: 100%; }
+            .table-card {
+                background: transparent;
+                border: none;
+                box-shadow: none;
+                overflow: hidden;
+                width: 100%;
+            }
+            .table-wrapper {
+                overflow: hidden;
+                width: 100%;
+            }
             
-            table, tbody { display: block; width: 100%; box-sizing: border-box; }
-            thead { display: none; }
+            table, tbody {
+                display: block;
+                width: 100%;
+                box-sizing: border-box;
+            }
+            thead {
+                display: none;
+            }
 
-            tbody { display: flex; flex-direction: column; gap: 12px; width: 100%; }
+            tbody {
+                display: flex;
+                flex-direction: column;
+                gap: 12px;
+                width: 100%;
+            }
 
             tr.m-card {
                 display: block !important;
@@ -730,8 +976,16 @@
                 width: 100%;
             }
 
-            .m-time { font-size: 0.8rem; font-weight: 600; color: #334155; }
-            .m-status-group { display: flex; align-items: center; gap: 6px; }
+            .m-time {
+                font-size: 0.8rem;
+                font-weight: 600;
+                color: #334155;
+            }
+            .m-status-group {
+                display: flex;
+                align-items: center;
+                gap: 6px;
+            }
 
             .m-card-body {
                 display: flex;
@@ -827,19 +1081,267 @@
             pointer-events: none;
             z-index: 100001;
         }
-        .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-    </style>
+        .toast.show {
+            transform: translateX(-50%) translateY(0);
+            opacity: 1;
+        }
+
+        .analytics-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+        }
+
+        .analytics-card .analytics-list {
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
+        .analytics-pagination-bar {
+            display: flex;
+            align-items: stretch;
+            justify-content: space-between;
+            width: 100%;
+            box-sizing: border-box;
+            min-height: 42px;
+            margin-top: auto;
+            padding: 0 10px;
+            background: #f8fafc;
+            border-top: 1px solid var(--border);
+            color: var(--text-muted);
+            font-size: 0.76rem;
+            flex-shrink: 0;
+        }
+
+        .analytics-pagination-info {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            padding: 0 8px;
+        }
+
+        .analytics-pagination-nums {
+            display: flex;
+            align-items: stretch;
+            justify-content: flex-end;
+            gap: 3px;
+        }
+
+        .analytics-page-btn {
+            min-width: 32px;
+            height: 30px;
+            align-self: center;
+            padding: 0 9px;
+            border: 1px solid transparent;
+            border-radius: 5px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.74rem;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .analytics-page-btn:hover:not(:disabled) {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background: #f0f6ff;
+        }
+
+        .analytics-page-btn.active {
+            background: var(--primary-blue);
+            color: #fff;
+            border-color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        .analytics-page-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .analytics-page-ellipsis {
+            display: flex;
+            align-items: center;
+            padding: 0 3px;
+        }
+
+        @media (max-width: 768px) {
+            .analytics-pagination-bar {
+                min-height: 40px;
+                padding: 0 7px;
+                font-size: 0.7rem;
+            }
+
+            .analytics-pagination-info {
+                padding: 0 4px;
+            }
+
+            .analytics-page-btn {
+                min-width: 29px;
+                height: 28px;
+                padding: 0 7px;
+                font-size: 0.7rem;
+            }
+        }
+
+
+
+        /* 分析卡片分页：与卡片背景无色差，左右/底部完整贴边 */
+        .analytics-card {
+            display: flex;
+            flex-direction: column;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .analytics-card .analytics-list {
+            flex: 1 1 auto;
+            min-height: 0;
+        }
+
+        .analytics-pagination-bar {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            width: calc(100% + 32px);
+            min-height: 42px;
+            margin: auto -16px -16px;
+            padding: 0 16px;
+            box-sizing: border-box;
+            background: transparent;
+            border: 0;
+            color: var(--text-muted);
+            font-size: 0.78rem;
+            flex-shrink: 0;
+        }
+
+        .analytics-pagination-info {
+            display: flex;
+            align-items: center;
+            white-space: nowrap;
+            color: var(--text-muted);
+        }
+
+        .analytics-pagination-info strong {
+            color: var(--text-primary);
+        }
+
+        .analytics-pagination-nums {
+            display: flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        /* 与监控日志列表分页按钮统一：透明底、边框、圆角、激活态 */
+        .analytics-page-btn {
+            min-width: 30px;
+            height: 30px;
+            padding: 0 9px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            background: transparent;
+            color: var(--text-primary);
+            font-size: 0.76rem;
+            cursor: pointer;
+            transition: all .15s ease;
+        }
+
+        .analytics-page-btn:hover:not(:disabled) {
+            border-color: var(--primary-blue);
+            color: var(--primary-blue);
+            background: transparent;
+        }
+
+        .analytics-page-btn.active {
+            background: var(--primary-blue);
+            color: #fff;
+            border-color: var(--primary-blue);
+            font-weight: 600;
+        }
+
+        .analytics-page-btn:disabled {
+            opacity: .45;
+            cursor: not-allowed;
+        }
+
+        .analytics-page-ellipsis {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            min-width: 20px;
+            color: var(--text-muted);
+        }
+
+        /* 移动端：四个分析卡片不出现内部滚动条 */
+        @media (max-width: 768px) {
+            .analytics-card {
+                overflow: hidden;
+            }
+
+            .analytics-card .analytics-list {
+                overflow-y: auto !important;
+                overflow-x: hidden !important;
+                max-height: 320px !important;
+                height: auto !important;
+
+                /* 保留触摸滑动/滚动，但隐藏可见滚动条 */
+                -webkit-overflow-scrolling: touch;
+                scrollbar-width: none;
+                -ms-overflow-style: none;
+            }
+
+            .analytics-card .analytics-list::-webkit-scrollbar {
+                width: 0;
+                height: 0;
+                display: none;
+            }
+
+            .analytics-pagination-bar {
+                width: calc(100% + 24px);
+                min-height: 40px;
+                margin-left: -12px;
+                margin-right: -12px;
+                margin-bottom: -12px;
+                padding: 0 12px;
+                font-size: 0.70rem;
+            }
+
+            .analytics-pagination-nums {
+                gap: 2px;
+            }
+
+            .analytics-page-btn {
+                min-width: 28px;
+                height: 28px;
+                padding: 0 7px;
+                font-size: 0.70rem;
+            }
+        }
+
+        /* 保留分析卡片滚动能力，但隐藏滚动条本身 */
+        .analytics-card .analytics-list {
+            scrollbar-width: none;
+            -ms-overflow-style: none;
+        }
+
+        .analytics-card .analytics-list::-webkit-scrollbar {
+            width: 0;
+            height: 0;
+            display: none;
+        }
+
+</style>
 </head>
 <body>
     <div class="container">
         <div class="top-bar">
             <div class="brand">
                 <span class="status-dot"></span>
-                <span class="brand-title">SubMonitor</span>
+                <span class="brand-title" onclick="openSystemControlModal()">SubMonitor</span>
             </div>
-            <div style="display: flex; align-items: center; gap: 12px;">
+            <div style="display: flex; align-items: center; gap: 8px;">
                 <div class="last-update">最后更新: <span id="update-time">--:--:--</span></div>
-                <button class="logout-btn" onclick="handleLogout()">退出登录</button>
+                <button class="sys-control-btn" onclick="openSystemControlModal()">控制面板</button>
             </div>
         </div>
 
@@ -872,11 +1374,11 @@
                 <div class="analytics-list" id="list-top-token"></div>
             </div>
             <div class="analytics-card">
-                <div class="analytics-header"><span class="analytics-title">可疑 TOKEN (多IP)</span></div>
+                <div class="analytics-header"><span class="analytics-title">今日可疑 TOKEN (多IP拉取同一TOKEN)</span></div>
                 <div class="analytics-list" id="list-sus-token"></div>
             </div>
             <div class="analytics-card">
-                <div class="analytics-header"><span class="analytics-title">可疑 IP (多TOKEN)</span></div>
+                <div class="analytics-header"><span class="analytics-title">今日可疑 IP (多TOKEN被同一IP拉取)</span></div>
                 <div class="analytics-list" id="list-sus-ip"></div>
             </div>
         </div>
@@ -887,8 +1389,7 @@
             <div class="control-row">
                 <input type="text" id="search" class="search-input" placeholder="搜索 IP、地区、Token、备注或 UA..." oninput="handleSearchInput()">
                 <div class="btn-group">
-                    <button class="btn" onclick="fetchData()">刷新数据</button>
-                    <button class="btn" onclick="openBlacklistModal()" style="color:var(--primary-red); border-color:#fecaca; background:#fef2f2;">🚫 黑名单管理</button>
+                    <button class="btn" onclick="refreshLogData()">刷新数据</button>
                     <button class="btn" onclick="clearAllFilters()">重置所有</button>
                 </div>
             </div>
@@ -910,31 +1411,6 @@
                     <button class="btn btn-quick" onclick="setQuickDays(7)">近7天</button>
                 </div>
             </div>
-
-            <div class="control-row">
-                <input type="text" id="upstream-input" class="search-input" placeholder="输入反代目标域名 (例如: airport.example.com)">
-                <button class="btn" style="background:#0284c7; color:#ffffff; border:none; font-weight:600;" onclick="submitUpstreamDomain()">更新反代目标域名</button>
-                <span id="upstream-display-badge" style="font-size:0.8rem; font-family:monospace; background:#e0f2fe; color:#0369a1; padding:6px 10px; border-radius:8px; border:1px solid #bae6fd; white-space:nowrap; margin-left:auto;">当前反代: <strong id="upstream-current-text">加载中...</strong></span>
-            </div>
-
-            <div class="control-row">
-                <input type="text" id="domain-input" class="search-input" placeholder="输入要修改的新域名 (例如: sub.example.com)">
-                <button class="btn" style="background:var(--primary-blue); color:#ffffff; border:none; font-weight:600;" onclick="submitDomainCert()">更新域名并申请证书</button>
-            </div>
-
-            <div class="control-row">
-                <input type="password" id="new-password-input" class="search-input" placeholder="输入新的管理员密码">
-                <button class="btn" style="background:var(--primary-green); color:#ffffff; border:none; font-weight:600;" onclick="submitChangePassword()">修改管理员密码</button>
-            </div>
-
-            <div id="cert-status-box" style="display:block; width:100%; font-size:0.78rem; padding:10px 12px; background:#f8fafc; border:1px solid var(--border); border-radius:8px; color:var(--text-primary); font-family:monospace; word-break:break-all;">
-                <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span>🔒 SSL证书状态：<span id="cert-status-text" style="color:var(--text-muted)">正在获取证书状态...</span></span>
-                    <button class="fill-helper-btn" onclick="checkCertStatus()" style="font-size:0.75rem;">🔄 刷新状态</button>
-                </div>
-                <div id="cert-detail-info" style="display:none; margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); line-height:1.6; font-size:0.75rem; color:var(--text-muted);">
-                </div>
-            </div>
         </div>
 
         <div class="table-card">
@@ -951,9 +1427,7 @@
                             <th style="text-align:center;">快速操作</th>
                         </tr>
                     </thead>
-                    <tbody id="log-table">
-                        <tr><td colspan="7" class="empty-state">加载数据中...</td></tr>
-                    </tbody>
+                    <tbody id="log-table"></tbody>
                 </table>
             </div>
             <div id="pc-pagination-container"></div>
@@ -961,7 +1435,6 @@
         <div id="mobile-load-more-container"></div>
     </div>
 
-    <!-- Time Modal -->
     <div id="time-modal" class="modal-overlay">
         <div class="modal-card">
             <div class="modal-header">选择自定义时间段 (精确到秒)</div>
@@ -992,34 +1465,86 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn" onclick="closeTimeModal()">取消</button>
+                <button class="btn" onclick="closeTimeModal()">关闭</button>
                 <button class="btn-primary" onclick="confirmTimeRange()">确定应用</button>
             </div>
         </div>
     </div>
 
-    <!-- Blacklist Modal -->
+    <div id="system-control-modal" class="modal-overlay">
+        <div class="modal-card" style="max-width: 580px;">
+            <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
+                <span>系统控制面板</span>
+                <button class="logout-btn sys-btn-unified" onclick="handleLogout()">退出登录</button>
+            </div>
+            <div class="modal-body" style="gap:16px;">
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
+                    <div>
+                        <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary);">黑名单规则管理</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">管理 IP、Token、UA 黑名单及手动添加封禁</div>
+                    </div>
+                    <button class="btn sys-btn-unified" onclick="openBlacklistModalFromSys()" style="color:var(--primary-red); border-color:#fecaca; background:#fef2f2;">黑名单</button>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">更新反代目标域名</div>
+                    <div style="font-size:0.75rem; color:var(--text-muted); margin-bottom:8px;">当前反代目标: <strong id="upstream-current-text" style="color:var(--primary-blue);">加载中...</strong></div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="text" id="upstream-input" class="search-input" placeholder="输入新反代域名 (例: airport.example.com)">
+                        <button class="btn sys-btn-unified" style="background:#0284c7; color:#ffffff; border:none;" onclick="submitUpstreamDomain()">更新反代</button>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:4px;">更新域名并申请 SSL 证书</div>
+                    <div style="display:flex; gap:6px; margin-bottom:8px;">
+                        <input type="text" id="domain-input" class="search-input" placeholder="输入新域名 (例: sub.example.com)">
+                        <button class="btn sys-btn-unified" style="background:var(--primary-blue); color:#ffffff; border:none;" onclick="submitDomainCert()">申请证书</button>
+                    </div>
+                    <div id="cert-status-box" style="font-size:0.78rem; padding:8px 10px; background:#fff; border:1px solid var(--border); border-radius:6px; font-family:monospace;">
+                        <div style="display:flex; justify-content:space-between; align-items:center;">
+                            <span>SSL证书状态：<span id="cert-status-text" style="color:var(--text-muted)">正在获取...</span></span>
+                            <button class="fill-helper-btn" onclick="checkCertStatus()" style="font-size:0.75rem;">刷新</button>
+                        </div>
+                        <div id="cert-detail-info" style="display:none; margin-top:4px; padding-top:4px; border-top:1px dashed var(--border); line-height:1.5; font-size:0.73rem; color:var(--text-muted);"></div>
+                    </div>
+                </div>
+
+                <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
+                    <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary); margin-bottom:8px;">修改管理员密码</div>
+                    <div style="display:flex; gap:6px;">
+                        <input type="password" id="new-password-input" class="search-input" placeholder="输入新的管理员密码">
+                        <button class="btn sys-btn-unified" style="background:var(--primary-green); color:#ffffff; border:none;" onclick="submitChangePassword()">修改密码</button>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary sys-btn-unified" onclick="closeSystemControlModal()">关闭</button>
+            </div>
+        </div>
+    </div>
+
     <div id="blacklist-modal" class="modal-overlay">
         <div class="modal-card" style="max-width: 580px;">
             <div class="modal-header" style="display:flex; justify-content:space-between; align-items:center;">
-                <span>🚫 黑名单规则管理</span>
-                <button class="fill-helper-btn" onclick="fetchBlacklistRules()" style="font-size:0.8rem;">🔄 刷新列表</button>
+                <span>黑名单规则管理</span>
+                <button class="fill-helper-btn" onclick="fetchBlacklistRules()" style="font-size:0.8rem;">刷新列表</button>
             </div>
             <div class="modal-body" style="gap:14px;">
                 <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px;">
                     <div style="font-size:0.78rem; font-weight:600; color:var(--text-muted); margin-bottom:8px;">主动追加封禁规则</div>
-                    <div style="display:flex; gap:6px;">
-                        <select id="bl-input-type" class="time-select" style="flex:0 0 90px;">
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                        <select id="bl-input-type" class="time-select" style="flex:0 0 85px;">
                             <option value="ip">IP 地址</option>
                             <option value="token">Token</option>
                             <option value="ua">User-Agent</option>
                         </select>
-                        <input type="text" id="bl-input-value" class="search-input" style="flex:1;" placeholder="输入要封禁的目标 (例: 1.2.3.4 或 token_hash)" onkeydown="if(event.key==='Enter') submitManualBan()">
-                        <button class="btn-primary" style="padding:6px 14px; font-size:0.8rem; flex-shrink:0;" onclick="submitManualBan()">添加封禁</button>
+                        <input type="text" id="bl-input-value" class="search-input" style="flex:1; min-width:0;" placeholder="输入要封禁的目标 (例: 1.2.3.4 或 token_hash)" onkeydown="if(event.key==='Enter') submitManualBan()">
+                        <button class="btn-primary" style="padding:6px 14px; font-size:0.8rem; flex-shrink:0; white-space:nowrap;" onclick="submitManualBan()">添加封禁</button>
                     </div>
                 </div>
 
-                <div style="display:flex; gap:6px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+                <div style="display:flex; gap:6px; border-bottom:1px solid var(--border); padding-bottom:8px; overflow-x:auto;">
                     <button id="bl-tab-ip" class="btn btn-quick active" onclick="switchBlTab('ip')">IP 黑名单 (<span id="bl-count-ip">0</span>)</button>
                     <button id="bl-tab-token" class="btn btn-quick" onclick="switchBlTab('token')">Token 黑名单 (<span id="bl-count-token">0</span>)</button>
                     <button id="bl-tab-ua" class="btn btn-quick" onclick="switchBlTab('ua')">UA 黑名单 (<span id="bl-count-ua">0</span>)</button>
@@ -1038,46 +1563,50 @@
     <div id="toast" class="toast">已复制到剪贴板</div>
 
     <script>
-        const ipGeoCache = {};
-        async function fetchAsyncIpGeo(ip, element) {
-            if (!ip || ip === '-' || element.dataset.fetched) return;
-            if (ipGeoCache[ip]) {
-                element.innerText = ipGeoCache[ip];
-                element.dataset.fetched = "true";
-                return;
-            }
-            try {
-                const res = await fetch(`https://ipapi.co/${ip}/json/`);
-                if(!res.ok) throw new Error('Network error');
-                const data = await res.json();
-                const info = [data.country_name, data.region, data.city].filter(Boolean).join(' ') || data.country || '';
-                if (info) {
-                    ipGeoCache[ip] = info;
-                    element.innerText = info;
+        // IP 归属地：只使用后端 logs.php 返回的 ip_info。
+        // 前端不再直接请求 ipwho.is / ipapi.co，避免 CORS、429 限流以及大量重复查询。
+        const ipGeoCache = Object.create(null);
+
+        // 归属地显示标准化：去掉 country / region / city 重复，同时保留运营商。
+        function normalizeIpGeo(info) {
+            info = String(info || '').trim();
+            if (!info) return '';
+            const parts = info.split(/\s+/).filter(Boolean);
+            const seen = new Set();
+            const result = [];
+            for (const part of parts) {
+                if (!seen.has(part)) {
+                    seen.add(part);
+                    result.push(part);
                 }
-            } catch (e) {
-                // Ignore geo fetch errors
-            } finally {
-                element.dataset.fetched = "true";
             }
+            return result.join(' ');
         }
 
-        (async function checkAuthOnLoad() {
-            try {
-                const res = await fetch('/api/check_status.php');
-                const data = await res.json();
-                if (data.code !== 200 && data.status !== 'success') {
-                    window.location.href = '/login.html';
-                } else {
-                    initializeApp();
-                }
-            } catch (e) {
-                window.location.href = '/login.html';
-            }
-        })();
+        function getGeo(ip) {
+            if (!ip || ip === '-') return '-';
+            return normalizeIpGeo(ipGeoCache[ip]) || '未知地区';
+        }
+
+        // 保留函数名以兼容现有渲染流程，但不再从浏览器访问第三方 IP API。
+        function fetchAsyncIpGeo(ip, elements) {
+            if (!ip || ip === '-') return;
+            const els = Array.isArray(elements) ? elements.filter(Boolean) : [elements].filter(Boolean);
+            const info = normalizeIpGeo(ipGeoCache[ip]) || '未知地区';
+            els.forEach(el => el.textContent = info);
+        }
+
+        function refreshGeoForIp(ip) {
+            // 归属地由后端统一查询和缓存。
+            return;
+        }
+
+        document.addEventListener('DOMContentLoaded', () => {
+            initializeApp();
+        });
 
         function handleLogout() {
-            if(!confirm('确定要退出当前管理面板吗？')) return;
+            if (!confirm('确定要退出当前管理面板吗？')) return;
             fetch('/api/login.php', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -1097,11 +1626,39 @@
 
         let currentPcPage = 1;
         const pcPageSize = 50;
+        const analyticsPageSize = 10;
+        const analyticsPages = { topIp: 1, topToken: 1, susToken: 1, susIp: 1 };
+        let analyticsSourceData = { topIp: [], topToken: [], susToken: [], susIp: [] };
         let mobileDisplayCount = 20;
         const mobileStep = 20;
         let searchDebounceTimer = null;
 
-        function padZero(n) { return n.toString().padStart(2, '0'); }
+        // 【交互防护】记录用户是否正与表格建立交互（鼠标悬停 / 文本选中）
+        let isTableHovered = false;
+
+        function isUserInteracting() {
+            const hasSelection = window.getSelection && window.getSelection().toString().trim().length > 0;
+            return isTableHovered || hasSelection;
+        }
+
+        function padZero(n) {
+            return n.toString().padStart(2, '0');
+        }
+
+        function openSystemControlModal() {
+            document.getElementById('system-control-modal').classList.add('active');
+            fetchUpstreamDomain();
+            checkCertStatus();
+        }
+
+        function closeSystemControlModal() {
+            document.getElementById('system-control-modal').classList.remove('active');
+        }
+
+        function openBlacklistModalFromSys() {
+            closeSystemControlModal();
+            openBlacklistModal();
+        }
 
         async function fetchUpstreamDomain() {
             try {
@@ -1138,10 +1695,10 @@
                 });
                 const data = await res.json();
                 if (data.status === 'success' || data.code === 200) {
-                    showToast('✅ ' + (data.message || '更新成功'));
+                    showToast((data.message || '更新成功'));
                     fetchUpstreamDomain();
                 } else {
-                    showToast('❌ ' + (data.message || '更新失败'));
+                    showToast((data.message || '更新失败'));
                 }
             } catch (err) {
                 showToast('网络通信失败，请检查后端 API 服务状态');
@@ -1197,14 +1754,14 @@
                 if ((data.status === 'success' || data.code === 200) && data.cert) {
                     const cert = data.cert;
                     let statusColor = 'var(--primary-green)';
-                    let statusBadge = '🟢 证书生效中';
+                    let statusBadge = '证书生效中';
                     
                     if (cert.days_left !== undefined && cert.days_left <= 0) {
                         statusColor = 'var(--primary-red)';
-                        statusBadge = '🔴 证书已过期';
+                        statusBadge = '证书已过期';
                     } else if (cert.days_left !== undefined && cert.days_left <= 15) {
                         statusColor = '#b45309';
-                        statusBadge = '🟡 证书即将过期';
+                        statusBadge = '证书即将过期';
                     }
 
                     statusText.innerHTML = `<strong style="color:${statusColor};">${statusBadge}</strong>`;
@@ -1215,7 +1772,7 @@
                         <div>到期时间：${escapeHtml(cert.valid_to || '-')}</div>
                     `;
                 } else {
-                    statusText.innerHTML = `<span style="color:#b45309;">⚠️ 未检测到有效 SSL 证书或尚未配置</span>`;
+                    statusText.innerHTML = `<span style="color:#b45309;">未检测到有效 SSL 证书或尚未配置</span>`;
                     detailBox.style.display = 'none';
                 }
             } catch (err) {
@@ -1235,9 +1792,9 @@
                 return;
             }
 
-            statusText.innerHTML = '⏱️ 正在提交域名配置，向 ACME/Let\'s Encrypt 申请 SSL 证书...';
+            statusText.innerHTML = '正在提交域名配置，向 ACME/Let\'s Encrypt 申请 SSL 证书...';
             detailBox.style.display = 'block';
-            detailBox.innerHTML = '<div style="color:var(--primary-blue);">👉 [1/3] 正在验证域名 DNS 解析与端口可达性...<br>👉 [2/3] 发起 ACME HTTP-01 验证挑战...</div>';
+            detailBox.innerHTML = '<div style="color:var(--primary-blue);">[1/3] 正在验证域名 DNS 解析与端口可达性...<br>[2/3] 发起 ACME HTTP-01 验证挑战...</div>';
 
             try {
                 const res = await fetch('/api/action.php', {
@@ -1247,15 +1804,15 @@
                 });
                 const data = await res.json();
                 if (data.status === 'success' || data.code === 200) {
-                    showToast('✅ SSL 证书申请成功！');
+                    showToast('SSL 证书申请成功！');
                     checkCertStatus();
                 } else {
-                    statusText.innerHTML = `❌ 申请失败`;
+                    statusText.innerHTML = `申请失败`;
                     detailBox.style.display = 'block';
                     detailBox.innerHTML = `<span style="color:var(--primary-red);">${escapeHtml(data.message || '请检查域名解析与服务配置')}</span>`;
                 }
             } catch (err) {
-                statusText.innerHTML = `❌ 请求出错`;
+                statusText.innerHTML = `请求出错`;
                 detailBox.style.display = 'block';
                 detailBox.innerHTML = `<span style="color:var(--primary-red);">网络通信失败，请检查后端 API 服务状态</span>`;
             }
@@ -1284,15 +1841,37 @@
                 .replace(/'/g, '&#39;');
         }
 
-        function dateToYMD(date) {
-            return `${date.getFullYear()}-${padZero(date.getMonth() + 1)}-${padZero(date.getDate())}`;
+        // 前后端统一使用 Asia/Shanghai，避免浏览器处于日本/其他时区时筛选边界错位。
+        const APP_TIME_ZONE = 'Asia/Shanghai';
+
+        function getTimeZoneParts(dateObj = new Date()) {
+            const parts = new Intl.DateTimeFormat('en-CA', {
+                timeZone: APP_TIME_ZONE,
+                year: 'numeric', month: '2-digit', day: '2-digit',
+                hour: '2-digit', minute: '2-digit', second: '2-digit',
+                hourCycle: 'h23'
+            }).formatToParts(dateObj);
+            const map = {};
+            parts.forEach(p => { if (p.type !== 'literal') map[p.type] = p.value; });
+            return map;
+        }
+
+        function dateToYMD(dateObj) {
+            const p = getTimeZoneParts(dateObj);
+            return `${p.year}-${p.month}-${p.day}`;
+        }
+
+        function formatShanghaiDateTime(dateObj) {
+            const p = getTimeZoneParts(dateObj);
+            return `${p.year}-${p.month}-${p.day} ${p.hour}:${p.minute}:${p.second}`;
         }
 
         function setModalPickerValues(prefix, dateObj) {
-            document.getElementById(`m-${prefix}-date`).value = dateToYMD(dateObj);
-            document.getElementById(`m-${prefix}-hour`).value = padZero(dateObj.getHours());
-            document.getElementById(`m-${prefix}-minute`).value = padZero(dateObj.getMinutes());
-            document.getElementById(`m-${prefix}-second`).value = padZero(dateObj.getSeconds());
+            const p = getTimeZoneParts(dateObj);
+            document.getElementById(`m-${prefix}-date`).value = `${p.year}-${p.month}-${p.day}`;
+            document.getElementById(`m-${prefix}-hour`).value = p.hour;
+            document.getElementById(`m-${prefix}-minute`).value = p.minute;
+            document.getElementById(`m-${prefix}-second`).value = p.second;
         }
 
         function getModalPickerValues(prefix) {
@@ -1306,8 +1885,8 @@
 
         function fillZeroStart() {
             const now = new Date();
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            setModalPickerValues('start', startOfToday);
+            const p = getTimeZoneParts(now);
+            setModalPickerValues('start', new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day))));
         }
 
         function fillNowEnd() {
@@ -1316,7 +1895,8 @@
 
         function openTimeModal() {
             const now = new Date();
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
+            const p = getTimeZoneParts(now);
+            const startOfToday = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day)));
 
             if (lockedStartTime) {
                 const parts = lockedStartTime.split(' ');
@@ -1370,41 +1950,41 @@
         function setQuickMinutes(minutes) {
             const now = new Date();
             const past = new Date(now.getTime() - minutes * 60 * 1000);
-            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
-            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            lockedStartTime = formatShanghaiDateTime(past);
+            lockedEndTime = formatShanghaiDateTime(now);
             updateLabelAndFilter();
         }
 
         function setQuickTime(hours) {
             const now = new Date();
             const past = new Date(now.getTime() - hours * 60 * 60 * 1000);
-            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
-            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            lockedStartTime = formatShanghaiDateTime(past);
+            lockedEndTime = formatShanghaiDateTime(now);
             updateLabelAndFilter();
         }
 
         function setTodayTime() {
             const now = new Date();
-            const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0);
-            lockedStartTime = `${dateToYMD(startOfToday)} 00:00:00`;
-            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            const p = getTimeZoneParts(now);
+            lockedStartTime = `${p.year}-${p.month}-${p.day} 00:00:00`;
+            lockedEndTime = formatShanghaiDateTime(now);
             updateLabelAndFilter();
         }
 
         function setYesterdayTime() {
             const now = new Date();
-            const startOfYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 0, 0, 0);
-            const endOfYest = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1, 23, 59, 59);
-            lockedStartTime = `${dateToYMD(startOfYest)} 00:00:00`;
-            lockedEndTime = `${dateToYMD(endOfYest)} 23:59:59`;
+            const p = getTimeZoneParts(now);
+            const yesterday = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day) - 1));
+            lockedStartTime = `${dateToYMD(yesterday)} 00:00:00`;
+            lockedEndTime = `${dateToYMD(yesterday)} 23:59:59`;
             updateLabelAndFilter();
         }
 
         function setQuickDays(days) {
             const now = new Date();
             const past = new Date(now.getTime() - days * 24 * 60 * 60 * 1000);
-            lockedStartTime = `${dateToYMD(past)} ${padZero(past.getHours())}:${padZero(past.getMinutes())}:${padZero(past.getSeconds())}`;
-            lockedEndTime = `${dateToYMD(now)} ${padZero(now.getHours())}:${padZero(now.getMinutes())}:${padZero(now.getSeconds())}`;
+            lockedStartTime = formatShanghaiDateTime(past);
+            lockedEndTime = formatShanghaiDateTime(now);
             updateLabelAndFilter();
         }
 
@@ -1418,7 +1998,9 @@
                 label.innerText = `${startStr} 至 ${endStr}`;
             }
             currentPcPage = 1;
-            fetchData();
+            mobileDisplayCount = 20;
+            invalidateLogRequestState();
+            fetchData(true);
         }
 
         function handleSearchInput() {
@@ -1426,8 +2008,16 @@
             searchDebounceTimer = setTimeout(() => {
                 currentPcPage = 1;
                 mobileDisplayCount = 20;
-                fetchData();
+                invalidateLogRequestState();
+                fetchData(true);
             }, 300);
+        }
+
+        function refreshLogData() {
+            // 手动刷新不改变搜索、时间范围或当前页，只让当前请求上下文重新从服务端取一次。
+            invalidateLogRequestState();
+            fetchData(true);
+            showToast('正在刷新日志数据…');
         }
 
         function showToast(text) {
@@ -1466,29 +2056,90 @@
             document.body.removeChild(textArea);
         }
 
-        function banTarget(type, value) {
+        function setBanButtonsForTarget(type, value, banned = true) {
+            document.querySelectorAll('.btn-ban[data-ban-type]').forEach(btn => {
+                if (btn.getAttribute('data-ban-type') !== type) return;
+                const current = btn.getAttribute('data-ban-value') || '';
+                const matched = type === 'ua'
+                    ? (current === value || current.includes(value) || value.includes(current))
+                    : current === value;
+                if (!matched) return;
+                btn.disabled = banned;
+                btn.style.opacity = banned ? '0.45' : '';
+                btn.style.cursor = banned ? 'not-allowed' : '';
+                btn.textContent = banned ? ('已封 ' + (type === 'ip' ? 'IP' : type === 'token' ? 'Token' : 'UA')) : ('封 ' + (type === 'ip' ? 'IP' : type === 'token' ? 'Token' : 'UA'));
+            });
+        }
+
+        async function banTarget(type, value, button) {
             if (!value || value === '-') return;
             const typeLabel = type === 'ip' ? 'IP' : (type === 'token' ? 'Token' : 'UA');
-            if (!confirm(`确定要封禁该 ${typeLabel} 吗？\n${value}`)) return;
+            if (button) {
+                button.disabled = true;
+                button.style.opacity = '0.45';
+                button.style.cursor = 'wait';
+                button.textContent = '检测中...';
+            }
 
-            fetch('/api/action.php', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ action: 'ban', type: type, value: value })
-            })
-            .then(res => res.json())
-            .then(data => {
-                if (data.status === 'success' || data.code === 200) {
+            // 点击时先向服务器确认最新黑名单，避免旧页面状态导致重复封禁。
+            try {
+                const synced = await fetchBlacklistRules(false);
+                if (!synced) throw new Error('blacklist sync failed');
+            } catch (e) {
+                if (button) { button.disabled = false; button.style.opacity = ''; button.style.cursor = ''; button.textContent = '封 ' + typeLabel; }
+                showToast('无法获取最新黑名单，已取消封禁操作');
+                return;
+            }
+
+            const list = currentBlData[type] || [];
+            const alreadyBanned = type === 'ua'
+                ? list.some(item => item === value || value.includes(item) || item.includes(value))
+                : list.includes(value);
+
+            if (alreadyBanned) {
+                showToast(`该 ${typeLabel} 已在黑名单中，无需重复封禁`);
+                setBanButtonsForTarget(type, value, true);
+                // 立即刷新当前按钮状态，不依赖打开黑名单窗口。
+                renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
+                return;
+            }
+
+            if (!confirm(`确定要封禁该 ${typeLabel} 吗？\n${value}`)) { if (button) { button.disabled = false; button.style.opacity = ''; button.style.cursor = ''; button.textContent = '封 ' + typeLabel; } return; }
+
+            try {
+                const res = await fetch('/api/action.php', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'ban', type: type, value: value })
+                });
+                const data = await res.json();
+                const success = data.status === 'success' || data.code === 200;
+
+                if (success) {
+                    // 【立即反馈】后端确认成功后，先立即更新本地黑名单状态并重绘按钮。
+                    // 用户无需等待刷新日志或打开黑名单窗口，按钮立刻置灰。
+                    if (!Array.isArray(currentBlData[type])) currentBlData[type] = [];
+                    if (!currentBlData[type].includes(value)) currentBlData[type].push(value);
+                    setBanButtonsForTarget(type, value, true);
+                    renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
                     showToast(`已成功封禁 ${typeLabel}: ${value}`);
-                    fetchData();
-                    if (document.getElementById('blacklist-modal').classList.contains('active')) {
-                        fetchBlacklistRules();
-                    }
+
+                    // 【服务端校验】随后重新拉取真实黑名单，防止多页面/并发操作造成状态不一致。
+                    await fetchBlacklistRules(false);
+                    setBanButtonsForTarget(type, value, true);
+                    renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
                 } else {
+                    // 后端拒绝/提示已存在时，以服务器状态为准，并立即刷新按钮。
+                    await fetchBlacklistRules(false);
+                    renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
                     showToast(data.message || '封禁失败');
                 }
-            })
-            .catch(() => showToast('封禁请求失败，请检查接口'));
+            } catch (e) {
+                // 请求异常不能把按钮误标为已封禁，重新从服务端同步一次。
+                await fetchBlacklistRules(false);
+                renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
+                showToast('封禁请求失败，请检查接口');
+            }
         }
 
         function openBlacklistModal() {
@@ -1500,19 +2151,29 @@
             document.getElementById('blacklist-modal').classList.remove('active');
         }
 
-        async function fetchBlacklistRules() {
+        async function fetchBlacklistRules(renderTableAfterSync = false) {
             try {
-                const res = await fetch('/api/action.php?action=list');
+                const res = await fetch('/api/action.php?action=list&_ts=' + Date.now(), { cache: 'no-store', headers: { 'Accept': 'application/json' } });
+                if (!res.ok) throw new Error('HTTP ' + res.status);
                 const ret = await res.json();
                 if (ret.status === 'success' || ret.code === 200) {
-                    currentBlData = ret.data || { ip: [], token: [], ua: [] };
+                    currentBlData = ret.data || ret.blacklist || ret.rules || { ip: [], token: [], ua: [] };
+                    currentBlData.ip = Array.isArray(currentBlData.ip) ? currentBlData.ip : [];
+                    currentBlData.token = Array.isArray(currentBlData.token) ? currentBlData.token : [];
+                    currentBlData.ua = Array.isArray(currentBlData.ua) ? currentBlData.ua : [];
                     document.getElementById('bl-count-ip').innerText = (currentBlData.ip || []).length;
                     document.getElementById('bl-count-token').innerText = (currentBlData.token || []).length;
                     document.getElementById('bl-count-ua').innerText = (currentBlData.ua || []).length;
                     renderBlacklistTab();
+                    if (renderTableAfterSync) {
+                        renderTableFiltered(typeof window.__lastTotalCount === 'number' ? window.__lastTotalCount : allLogs.length);
+                    }
+                    return true;
                 }
+                throw new Error(ret.message || '黑名单接口返回异常');
             } catch (e) {
-                showToast('获取黑名单列表失败');
+                console.error('fetchBlacklistRules:', e);
+                return false;
             }
         }
 
@@ -1560,8 +2221,8 @@
                 showToast(data.message || '操作成功');
                 if (data.status === 'success' || data.code === 200) {
                     document.getElementById('bl-input-value').value = '';
-                    fetchBlacklistRules();
-                    fetchData();
+                    await fetchBlacklistRules();
+                    await fetchData();
                 }
             } catch (e) {
                 showToast('网络请求失败');
@@ -1579,8 +2240,8 @@
                 const data = await res.json();
                 showToast(data.message || '操作成功');
                 if (data.status === 'success' || data.code === 200) {
-                    fetchBlacklistRules();
-                    fetchData();
+                    await fetchBlacklistRules();
+                    await fetchData();
                 }
             } catch (e) {
                 showToast('网络请求失败');
@@ -1594,7 +2255,9 @@
             return `<button class="btn-copy-icon" data-copy="${safeText}" data-label="${escapeHtml(label)}" onclick="event.stopPropagation(); copyToClipboard(this.getAttribute('data-copy'), this.getAttribute('data-label'))" title="复制 ${escapeHtml(label)}">${copyIconSvg}</button>`;
         }
 
-        function toggleExpand(el) { el.classList.toggle('expanded'); }
+        function toggleExpand(el) {
+            el.classList.toggle('expanded');
+        }
 
         function getStatusBadge(code) {
             const strCode = String(code);
@@ -1612,30 +2275,18 @@
             }
         }
 
-        function getRemarkText(code) {
-            const strCode = String(code);
-            switch(strCode) {
-                case '200': return '拉取订阅';
-                case '400': return '伪造请求';
-                case '403': return '异常用户';
-                case '404': return '路径错误';
-                case '429': return '请求过多';
-                case '500':
-                case '502': return '服务异常';
-                default: return '';
-            }
-        }
-
         function getRemark(code) {
             const strCode = String(code);
             switch(strCode) {
                 case '200': return '<span class="remark-text" style="color:#16a34a;">拉取订阅</span>';
                 case '400': return '<span class="remark-text" style="color:#b45309;">伪造请求</span>';
+                case '401': return '<span class="remark-text" style="color:#dc2626;">未授权请求</span>';
                 case '403': return '<span class="remark-text" style="color:#dc2626;">异常用户</span>';
                 case '404': return '<span class="remark-text" style="color:#6b21a8;">路径错误</span>';
                 case '429': return '<span class="remark-text" style="color:#ea580c;">请求过多</span>';
                 case '500':
-                case '502': return '<span class="remark-text" style="color:#9f1239;">服务异常</span>';
+                case '502':
+                case '503': return '<span class="remark-text" style="color:#9f1239;">服务异常</span>';
                 default: return `<span class="remark-text" style="color:var(--text-muted);">-</span>`;
             }
         }
@@ -1650,42 +2301,177 @@
             </div>`;
         }
 
-        async function fetchData() {
-            try {
-                await fetchBlacklistRules();
+        // 【防抖动优化】保存上一次已经渲染的数据指纹。
+        // 定时刷新仍然会请求最新日志，但只有数据真正发生变化时才重绘日志列表。
+        let lastLogSignature = '';
+        let lastAnalyticsSignature = '';
+        let lastTotalCount = null;
+        let lastRenderMode = '';
+        let fetchDataRunning = false;
+        let fetchDataQueued = false;
+        let fetchRequestSeq = 0;
+        let activeFetchContext = '';
 
+        function getLogSignature(logs) {
+            try {
+                return JSON.stringify(logs || []);
+            } catch (e) {
+                return String(logs || '');
+            }
+        }
+
+        function getAnalyticsSignature(analytics) {
+            try {
+                return JSON.stringify(analytics || {});
+            } catch (e) {
+                return String(analytics || '');
+            }
+        }
+
+        function getCurrentFilterContext() {
+            const isMobile = window.innerWidth <= 768;
+            const searchVal = (document.getElementById('search')?.value || '').trim();
+            return JSON.stringify({
+                search: searchVal,
+                start_time: lockedStartTime || '',
+                end_time: lockedEndTime || '',
+                page: isMobile ? 1 : currentPcPage,
+                limit: isMobile ? mobileDisplayCount : pcPageSize,
+                mode: isMobile ? 'mobile' : 'desktop'
+            });
+        }
+
+        function invalidateLogRequestState() {
+            // 任何搜索/时间/分页条件变化，都让正在途中的旧响应失效。
+            fetchRequestSeq++;
+            activeFetchContext = getCurrentFilterContext();
+            lastLogSignature = '';
+            lastTotalCount = null;
+            lastRenderMode = '';
+        }
+
+        async function fetchData(forceRefresh = false) {
+            // 同一时刻只允许一个请求；如果期间发生了新筛选/搜索/翻页，结束后只补发最新上下文。
+            if (fetchDataRunning) {
+                fetchDataQueued = true;
+                return;
+            }
+
+            fetchDataRunning = true;
+            const requestSeq = ++fetchRequestSeq;
+            const requestContext = getCurrentFilterContext();
+            activeFetchContext = requestContext;
+
+            try {
                 const isMobile = window.innerWidth <= 768;
-                const searchVal = (document.getElementById('search').value || '').trim();
+                const searchVal = (document.getElementById('search')?.value || '').trim();
                 const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
+                const fetchPage = isMobile ? 1 : currentPcPage;
 
                 const params = new URLSearchParams({
-                    page: currentPcPage,
-                    limit: fetchLimit
+                    page: fetchPage,
+                    limit: fetchLimit,
+                    // 明确告诉后端：搜索/时间条件必须在“全部日志”上过滤后再分页。
+                    scope: 'all'
                 });
 
                 if (searchVal) params.append('search', searchVal);
                 if (lockedStartTime) params.append('start_time', lockedStartTime);
                 if (lockedEndTime) params.append('end_time', lockedEndTime);
 
-                const res = await fetch(`/api/logs.php?${params.toString()}`);
+                const res = await fetch(`/api/logs.php?${params.toString()}`, {
+                    cache: 'no-store',
+                    headers: { 'Cache-Control': 'no-cache' }
+                });
+
+                if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
                 const responseData = await res.json();
-                
-                allLogs = responseData.data || [];
-                const totalCount = responseData.total !== undefined ? responseData.total : allLogs.length;
-                
+
+                // 请求返回后再次核对：如果期间用户改过搜索、时间、页码或设备模式，
+                // 这一份结果绝对不能写进页面，否则就会出现“切到有日志仍显示无日志”。
+                const latestContext = getCurrentFilterContext();
+                if (requestSeq !== fetchRequestSeq || requestContext !== latestContext || requestContext !== activeFetchContext) {
+                    fetchDataQueued = true;
+                    return;
+                }
+
+                const newLogs = Array.isArray(responseData.data) ? responseData.data : [];
+                const totalCount = responseData.total !== undefined
+                    ? Number(responseData.total) || 0
+                    : newLogs.length;
+                const analytics = responseData.analytics || {};
+
+                const newLogSignature = getLogSignature(newLogs);
+                const newAnalyticsSignature = getAnalyticsSignature(analytics);
+                const renderMode = isMobile ? 'mobile' : 'desktop';
+                const logsChanged = newLogSignature !== lastLogSignature;
+                const analyticsChanged = newAnalyticsSignature !== lastAnalyticsSignature;
+                const totalChanged = totalCount !== lastTotalCount;
+                const renderModeChanged = renderMode !== lastRenderMode;
+
+                // PC 页码只允许落在当前筛选结果范围内；筛选条件变化时已经在入口处重置为 1。
+                if (!isMobile) {
+                    const totalPages = Math.max(1, Math.ceil(totalCount / pcPageSize));
+                    if (currentPcPage > totalPages) {
+                        currentPcPage = 1;
+                        invalidateLogRequestState();
+                        fetchDataQueued = true;
+                        return;
+                    }
+                }
+
+                allLogs = newLogs;
+                window.__lastTotalCount = totalCount;
+
                 const now = new Date();
-                document.getElementById('update-time').innerText = now.toTimeString().split(' ')[0];
-                
+                document.getElementById('update-time').innerText =
+                    getTimeZoneParts(now).hour + ':' +
+                    getTimeZoneParts(now).minute + ':' +
+                    getTimeZoneParts(now).second;
+
                 renderStats(allLogs, responseData);
-                renderAnalyticsCards(responseData.analytics || {});
-                renderTableFiltered(totalCount);
+
+                if (analyticsChanged || lastAnalyticsSignature === '') {
+                    renderAnalyticsCards(analytics);
+                }
+
+                // filter context 变化时，即使新旧结果碰巧相同，也强制刷新一次表格状态。
+                const contextChanged = activeFetchContext !== requestContext;
+                if (forceRefresh || contextChanged || logsChanged || totalChanged || renderModeChanged || lastLogSignature === '') {
+                    renderTableFiltered(totalCount);
+                }
+
+                lastLogSignature = newLogSignature;
+                lastAnalyticsSignature = newAnalyticsSignature;
+                lastTotalCount = totalCount;
+                lastRenderMode = renderMode;
+                activeFetchContext = requestContext;
+
             } catch (err) {
-                document.getElementById('log-table').innerHTML = '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+                console.error('fetchData error:', err);
+                // 只有当前请求仍然对应当前筛选条件时，才显示错误。
+                if (requestSeq === fetchRequestSeq && requestContext === getCurrentFilterContext()) {
+                    if (lastLogSignature === '') {
+                        document.getElementById('log-table').innerHTML =
+                            '<tr><td colspan="7" class="empty-state" style="color:var(--primary-red)">获取日志失败，请检查服务状态。</td></tr>';
+                    }
+                }
+            } finally {
+                fetchDataRunning = false;
+                if (fetchDataQueued) {
+                    fetchDataQueued = false;
+                    setTimeout(() => fetchData(false), 0);
+                }
             }
         }
 
         function renderTableFiltered(totalCount) {
             renderTable(allLogs, totalCount);
+            setTimeout(() => {
+                const ips = [...new Set(allLogs.map(x => x.ip).filter(ip => ip && ip !== '-'))];
+                ips.forEach(refreshGeoForIp);
+            }, 20);
         }
 
         function renderStats(logs, responseData) {
@@ -1705,116 +2491,227 @@
         }
 
         function renderAnalyticsCards(analyticsData) {
-            const topIpList = analyticsData.top_ips || [];
-            const topTokenList = analyticsData.top_tokens || [];
-            const susTokenList = analyticsData.sus_tokens || [];
-            const susIpList = analyticsData.sus_ips || [];
+            analyticsSourceData = {
+                topIp: Array.isArray(analyticsData?.top_ips) ? analyticsData.top_ips : [],
+                topToken: Array.isArray(analyticsData?.top_tokens) ? analyticsData.top_tokens : [],
+                susToken: Array.isArray(analyticsData?.sus_tokens) ? analyticsData.sus_tokens : [],
+                susIp: Array.isArray(analyticsData?.sus_ips) ? analyticsData.sus_ips : []
+            };
 
-            renderCardList('list-top-ip', topIpList, item => {
-                const infoId = 'geo-top-ip-' + Math.random().toString(36).substring(2, 9);
-                if (!item.info && item.ip && item.ip !== '-') {
-                    setTimeout(() => {
-                        const el = document.getElementById(infoId);
-                        if (el) fetchAsyncIpGeo(item.ip, el);
-                    }, 50);
-                }
-                return `
-                <div class="item-left">
-                    <span class="rank-num">${item.rank}</span>
-                    <div class="item-main">
-                        <div class="item-title-row">
-                            <span class="item-title">${escapeHtml(item.ip)}</span>
-                            ${renderCopyBtn(item.ip, 'IP')}
-                        </div>
-                        <span id="${infoId}" class="item-sub">${escapeHtml(item.info || (item.ip !== '-' ? '获取中...' : ''))}</span>
-                    </div>
-                </div>
-                <div class="item-right">
-                    <span class="count-badge">${item.count}次</span>
-                </div>
-            `;
+            Object.keys(analyticsPages).forEach(key => {
+                const totalPages = Math.max(1, Math.ceil(analyticsSourceData[key].length / analyticsPageSize));
+                if (analyticsPages[key] > totalPages) analyticsPages[key] = totalPages;
             });
 
-            renderCardList('list-top-token', topTokenList, item => {
-                const timeOnly = item.lastTime ? item.lastTime.split(' ')[1] : '';
-                return `
-                    <div class="item-left">
-                        <span class="rank-num">${item.rank}</span>
-                        <div class="item-main">
-                            <div class="item-title-row">
-                                <span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>
-                                ${renderCopyBtn(item.token, 'Token')}
-                            </div>
-                            <span class="item-sub">${timeOnly}</span>
-                        </div>
-                    </div>
-                    <div class="item-right">
-                        <span class="count-badge">${item.count}次</span>
-                    </div>
-                `;
-            });
-
-            renderCardList('list-sus-token', susTokenList, item => `
-                <div class="item-left">
-                    <span class="rank-num">${item.rank}</span>
-                    <div class="item-main">
-                        <div class="item-title-row">
-                            <span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>
-                            ${renderCopyBtn(item.token, 'Token')}
-                        </div>
-                    </div>
-                </div>
-                <div class="item-right">
-                    <span class="count-badge" style="color:var(--primary-red)">${item.ipCount} 个IP</span>
-                </div>
-            `);
-
-            renderCardList('list-sus-ip', susIpList, item => {
-                const infoId = 'geo-sus-ip-' + Math.random().toString(36).substring(2, 9);
-                if (!item.info && item.ip && item.ip !== '-') {
-                    setTimeout(() => {
-                        const el = document.getElementById(infoId);
-                        if (el) fetchAsyncIpGeo(item.ip, el);
-                    }, 50);
-                }
-                return `
-                <div class="item-left">
-                    <span class="rank-num">${item.rank}</span>
-                    <div class="item-main">
-                        <div class="item-title-row">
-                            <span class="item-title">${escapeHtml(item.ip)}</span>
-                            ${renderCopyBtn(item.ip, 'IP')}
-                        </div>
-                        <span id="${infoId}" class="item-sub">${escapeHtml(item.info || (item.ip !== '-' ? '获取中...' : ''))}</span>
-                    </div>
-                </div>
-                <div class="item-right">
-                    <span class="count-badge" style="color:var(--primary-red)">${item.tokenCount} 个Token</span>
-                </div>
-            `;
-            });
+            renderAnalyticsCardPage('topIp');
+            renderAnalyticsCardPage('topToken');
+            renderAnalyticsCardPage('susToken');
+            renderAnalyticsCardPage('susIp');
         }
 
-        function renderCardList(containerId, list, templateFn) {
-            const el = document.getElementById(containerId);
+        function changeAnalyticsPage(key, page) {
+            const list = analyticsSourceData[key] || [];
+            const totalPages = Math.max(1, Math.ceil(list.length / analyticsPageSize));
+            const nextPage = Math.min(Math.max(1, Number(page) || 1), totalPages);
+            if (analyticsPages[key] === nextPage) return;
+            analyticsPages[key] = nextPage;
+            renderAnalyticsCardPage(key);
+        }
+
+        function renderAnalyticsPagination(key, currentPage, totalPages, totalCount) {
+            let pagesHtml = '';
+
+            for (let i = 1; i <= totalPages; i++) {
+                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
+                    pagesHtml += `<button class="analytics-page-btn ${i === currentPage ? 'active' : ''}" onclick="changeAnalyticsPage('${key}', ${i})">${i}</button>`;
+                } else if (i === currentPage - 3 || i === currentPage + 3) {
+                    pagesHtml += '<span class="analytics-page-ellipsis">...</span>';
+                }
+            }
+
+            return `
+                <div class="analytics-pagination-bar">
+                    <div class="analytics-pagination-info">
+                        共 <strong>${totalCount}</strong> 条记录，当前第 <strong>${currentPage}/${totalPages}</strong> 页
+                    </div>
+                    <div class="analytics-pagination-nums">
+                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>上一页</button>
+                        ${pagesHtml}
+                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>下一页</button>
+                    </div>
+                </div>`;
+        }
+
+        function renderAnalyticsCardPage(key) {
+            const configs = {
+                topIp: ['list-top-ip', item => `
+                    <div class="item-left"><span class="rank-num">${item.rank}</span><div class="item-main"><div class="item-title-row"><span class="item-title">${escapeHtml(item.ip)}</span>${renderCopyBtn(item.ip, 'IP')}</div><span class="item-sub" data-geo-ip="${escapeHtml(item.ip)}">${escapeHtml(item.info && item.info !== '未知地区' ? item.info : getGeo(item.ip))}</span></div></div>
+                    <div class="item-right"><span class="count-badge">${item.count}次</span></div>`],
+                topToken: ['list-top-token', item => { const timeOnly = item.lastTime ? item.lastTime.split(' ')[1] : ''; return `
+                    <div class="item-left"><span class="rank-num">${item.rank}</span><div class="item-main"><div class="item-title-row"><span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>${renderCopyBtn(item.token, 'Token')}</div><span class="item-sub">${timeOnly}</span></div></div>
+                    <div class="item-right"><span class="count-badge">${item.count}次</span></div>`; }],
+                susToken: ['list-sus-token', item => `
+                    <div class="item-left"><span class="rank-num">${item.rank}</span><div class="item-main"><div class="item-title-row"><span class="item-title" title="${escapeHtml(item.token)}">${escapeHtml(item.token)}</span>${renderCopyBtn(item.token, 'Token')}</div></div></div>
+                    <div class="item-right"><span class="count-badge" style="color:var(--primary-red)">${item.ipCount} 个IP</span></div>`],
+                susIp: ['list-sus-ip', item => `
+                    <div class="item-left"><span class="rank-num">${item.rank}</span><div class="item-main"><div class="item-title-row"><span class="item-title">${escapeHtml(item.ip)}</span>${renderCopyBtn(item.ip, 'IP')}</div><span class="item-sub" data-geo-ip="${escapeHtml(item.ip)}">${escapeHtml(item.info && item.info !== '未知地区' ? item.info : getGeo(item.ip))}</span></div></div>
+                    <div class="item-right"><span class="count-badge" style="color:var(--primary-red)">${item.tokenCount} 个Token</span></div>`]
+            };
+
+            const cfg = configs[key];
+            if (!cfg) return;
+
+            const el = document.getElementById(cfg[0]);
             if (!el) return;
-            if (!list || list.length === 0) {
+
+            const list = analyticsSourceData[key] || [];
+            const totalPages = Math.max(1, Math.ceil(list.length / analyticsPageSize));
+            const page = Math.min(Math.max(1, analyticsPages[key] || 1), totalPages);
+            analyticsPages[key] = page;
+
+            const start = (page - 1) * analyticsPageSize;
+            const items = list.slice(start, start + analyticsPageSize);
+
+            // 分页栏固定在四个分析卡片底部，列表本身只保留日志项。
+            const card = el.closest('.analytics-card');
+            if (card) {
+                const oldPagination = card.querySelector('.analytics-pagination-bar');
+                if (oldPagination) oldPagination.remove();
+            }
+
+            if (!items.length) {
                 el.innerHTML = '<div style="color:var(--text-muted); font-size:0.75rem; text-align:center; padding:24px 0;">暂无记录</div>';
                 return;
             }
-            el.innerHTML = list.map((item, idx) => {
-                item.rank = idx + 1;
-                return `<div class="analytics-item">${templateFn(item)}</div>`;
-            }).join('');
+
+            el.innerHTML = items.map((item, idx) =>
+                `<div class="analytics-item">${cfg[1]({...item, rank: start + idx + 1})}</div>`
+            ).join('');
+
+            if (card) {
+                card.insertAdjacentHTML(
+                    'beforeend',
+                    renderAnalyticsPagination(key, page, totalPages, list.length)
+                );
+            }
+
+            if (key === 'topIp' || key === 'susIp') {
+                setTimeout(() => el.querySelectorAll('[data-geo-ip]').forEach(node => {
+                    const ip = node.getAttribute('data-geo-ip');
+                    if (ip) refreshGeoForIp(ip);
+                }), 20);
+            }
+        }
+
+        // 【稳定渲染】只新增/移动/更新真正发生变化的行，不再每次刷新都重建整个 tbody。
+        // 这样 5 秒轮询拿到新日志时，旧行的 DOM、文本选区、展开状态等都尽量保持不动。
+        function getLogDomKey(log) {
+            if (log && log.id !== undefined && log.id !== null) return `id:${log.id}`;
+            if (log && log.log_id !== undefined && log.log_id !== null) return `log_id:${log.log_id}`;
+            // 后端当前未明确提供 id 时，用日志核心字段组成稳定 key。
+            return `log:${JSON.stringify([
+                log && log.time || '',
+                log && log.ip || '',
+                log && log.token || '',
+                log && log.ua || ''
+            ])}`;
+        }
+
+        function getLogDomSignature(log) {
+            try {
+                return JSON.stringify(log || {});
+            } catch (e) {
+                return String(log || '');
+            }
+        }
+
+        function patchLogRows(tbody, logs, renderRow, emptyHtml) {
+            if (!tbody) return;
+
+            if (!logs || logs.length === 0) {
+                if (tbody.dataset.emptyRendered !== '1') {
+                    tbody.innerHTML = emptyHtml;
+                    tbody.dataset.emptyRendered = '1';
+                }
+                return;
+            }
+
+            tbody.dataset.emptyRendered = '0';
+
+            const existing = new Map();
+            Array.from(tbody.children).forEach(row => {
+                const key = row.getAttribute('data-log-key');
+                if (key) existing.set(key, row);
+            });
+
+            const fragment = document.createDocumentFragment();
+            const usedKeys = new Set();
+            const keyOccurrences = new Map();
+
+            logs.forEach(log => {
+                // 没有后端唯一 ID 的历史日志可能出现完全相同的 time/ip/token/ua。
+                // 给重复 key 增加出现序号，避免多条历史记录被错误合并成一行。
+                const baseKey = getLogDomKey(log);
+                const occurrence = keyOccurrences.get(baseKey) || 0;
+                keyOccurrences.set(baseKey, occurrence + 1);
+                const key = `${baseKey}#${occurrence}`;
+                const signature = getLogDomSignature(log);
+                let row = existing.get(key);
+
+                if (row) {
+                    usedKeys.add(key);
+                    if (row.getAttribute('data-log-signature') !== signature) {
+                        const wrapper = document.createElement('tbody');
+                        wrapper.innerHTML = renderRow(log).trim();
+                        const newRow = wrapper.firstElementChild;
+                        if (newRow) {
+                            newRow.setAttribute('data-log-key', key);
+                            newRow.setAttribute('data-log-signature', signature);
+                            row.replaceWith(newRow);
+                            row = newRow;
+                        }
+                    }
+                } else {
+                    const wrapper = document.createElement('tbody');
+                    wrapper.innerHTML = renderRow(log).trim();
+                    row = wrapper.firstElementChild;
+                    if (row) {
+                        row.setAttribute('data-log-key', key);
+                        row.setAttribute('data-log-signature', signature);
+                    }
+                }
+
+                if (row) fragment.appendChild(row);
+            });
+
+            // 删除本次数据中已经不存在的旧行。
+            Array.from(tbody.children).forEach(row => {
+                const key = row.getAttribute('data-log-key');
+                if (key && !usedKeys.has(key)) row.remove();
+            });
+
+            // appendChild 已经会移动已有节点，因此不会重新创建旧行。
+            tbody.appendChild(fragment);
         }
 
         function renderTable(logs, totalCount) {
+            // 使用后端返回的 ip_info 作为当前页面唯一归属地来源。
+            (Array.isArray(logs) ? logs : []).forEach(l => {
+                if (l && l.ip && l.ip !== '-' && l.ip_info && l.ip_info !== '未知地区') {
+                    ipGeoCache[l.ip] = normalizeIpGeo(l.ip_info);
+                }
+            });
             const tbody = document.getElementById('log-table');
             const pcPaginationContainer = document.getElementById('pc-pagination-container');
             const mobileLoadMoreContainer = document.getElementById('mobile-load-more-container');
 
             if (logs.length === 0) {
-                tbody.innerHTML = '<tr><td colspan="7" class="empty-state">未查询到符合条件的日志记录</td></tr>';
+                patchLogRows(
+                    tbody,
+                    [],
+                    null,
+                    ''
+                );
                 pcPaginationContainer.innerHTML = '';
                 mobileLoadMoreContainer.innerHTML = '';
                 return;
@@ -1829,19 +2726,11 @@
             if (isMobile) {
                 pcPaginationContainer.innerHTML = '';
 
-                tbody.innerHTML = logs.map(l => {
+                patchLogRows(tbody, logs, l => {
                     const hasUa = l.ua && l.ua !== '-';
                     const uaHtml = hasUa
                         ? `<div class="m-ua-box" onclick="toggleExpand(this)" title="点击展开/折叠完整 UA">${escapeHtml(l.ua)}</div>`
                         : '';
-
-                    const infoId = 'm-geo-' + Math.random().toString(36).substring(2, 9);
-                    if (!l.ip_info && l.ip && l.ip !== '-') {
-                        setTimeout(() => {
-                            const el = document.getElementById(infoId);
-                            if (el) fetchAsyncIpGeo(l.ip, el);
-                        }, 50);
-                    }
 
                     const ipBanned = isIpBanned(l.ip);
                     const tokenBanned = isTokenBanned(l.token);
@@ -1862,12 +2751,12 @@
                                         <div class="m-value">
                                             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
                                                 ${renderPillBox(l.ip, 'IP')}
-                                                ${l.ip && l.ip !== '-' ? (ipBanned 
+                                                ${l.ip && l.ip !== '-' ? (ipBanned
                                                     ? `<button class="btn-ban" style="opacity:0.5; cursor:not-allowed;" disabled>已封 IP</button>`
-                                                    : `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封 IP</button>`
+                                                    : `<button class="btn-ban" data-ban-type="ip" data-ban-value="${escapeHtml(l.ip)}" onclick="banTarget('ip', '${escapeHtml(l.ip)}', this)">封 IP</button>`
                                                 ) : ''}
                                             </div>
-                                            <div id="${infoId}" class="ip-sub" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
+                                            <div class="ip-sub" data-geo-ip="${escapeHtml(l.ip)}" onclick="toggleExpand(this)" title="点击展开/折叠完整归属地">${escapeHtml(normalizeIpGeo(l.ip_info && l.ip_info !== '未知地区' ? l.ip_info : getGeo(l.ip)))}</div>
                                         </div>
                                     </div>
                                     <div class="m-row">
@@ -1875,9 +2764,9 @@
                                         <div class="m-value">
                                             <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap; justify-content:flex-end;">
                                                 ${renderPillBox(l.token, 'Token')}
-                                                ${l.token && l.token !== '-' ? (tokenBanned 
+                                                ${l.token && l.token !== '-' ? (tokenBanned
                                                     ? `<button class="btn-ban" style="opacity:0.5; cursor:not-allowed;" disabled>已封 Token</button>`
-                                                    : `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封 Token</button>`
+                                                    : `<button class="btn-ban" data-ban-type="token" data-ban-value="${escapeHtml(l.token)}" onclick="banTarget('token', '${escapeHtml(l.token)}', this)">封 Token</button>`
                                                 ) : ''}
                                             </div>
                                         </div>
@@ -1887,7 +2776,7 @@
                             </td>
                         </tr>
                     `;
-                }).join('');
+                }, '');
 
                 if (logs.length < totalCount) {
                     mobileLoadMoreContainer.innerHTML = `
@@ -1909,33 +2798,24 @@
                 const totalPages = Math.ceil(totalCount / pcPageSize) || 1;
                 if (currentPcPage > totalPages) currentPcPage = totalPages;
 
-                tbody.innerHTML = logs.map(l => {
-                    const infoId = 'pc-geo-' + Math.random().toString(36).substring(2, 9);
-                    if (!l.ip_info && l.ip && l.ip !== '-') {
-                        setTimeout(() => {
-                            const el = document.getElementById(infoId);
-                            if (el) fetchAsyncIpGeo(l.ip, el);
-                        }, 50);
-                    }
-
+                patchLogRows(tbody, logs, l => {
                     const ipBanned = isIpBanned(l.ip);
                     const tokenBanned = isTokenBanned(l.token);
                     const uaBanned = isUaBanned(l.ua);
-
-                    let remarkHtml = getRemark(l.status);
+                    const remarkHtml = getRemark(l.status);
 
                     return `
                         <tr>
-                            <td style="color:#334155">${escapeHtml(l.time)}</td>
+                            <td style="color:#334155; white-space:nowrap;">${escapeHtml(l.time)}</td>
                             <td>
-                                <div style="display:flex; align-items:center; gap:4px;">
+                                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                     ${renderPillBox(l.ip, 'IP')}
                                     ${ipBanned ? '<span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁</span>' : ''}
                                 </div>
-                                <div id="${infoId}" class="ip-sub">${escapeHtml(l.ip_info || (l.ip !== '-' ? '获取中...' : ''))}</div>
+                                <div class="ip-sub" data-geo-ip="${escapeHtml(l.ip)}">${escapeHtml(normalizeIpGeo(l.ip_info && l.ip_info !== '未知地区' ? l.ip_info : getGeo(l.ip)))}</div>
                             </td>
                             <td>
-                                <div style="display:flex; align-items:center; gap:4px;">
+                                <div style="display:flex; align-items:center; gap:4px; flex-wrap:wrap;">
                                     ${renderPillBox(l.token, 'Token')}
                                     ${tokenBanned ? '<span class="badge badge-403" style="font-size:0.68rem; padding:1px 4px;">已封禁</span>' : ''}
                                 </div>
@@ -1946,27 +2826,28 @@
                                 ${uaBanned ? '<span style="color:#dc2626; font-weight:600; margin-right:4px;">[已封禁UA]</span>' : ''}
                                 ${escapeHtml(l.ua)}
                             </td>
-                            <td style="text-align:center;">
+                            <td style="text-align:center; white-space:nowrap;">
                                 <div class="ban-actions" style="justify-content:center;">
-                                    ${l.ip && l.ip !== '-' ? (ipBanned 
-                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 IP</button>` 
-                                        : `<button class="btn-ban" onclick="banTarget('ip', '${escapeHtml(l.ip)}')">封 IP</button>`) : ''}
-                                    ${l.token && l.token !== '-' ? (tokenBanned 
-                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 Token</button>` 
-                                        : `<button class="btn-ban" onclick="banTarget('token', '${escapeHtml(l.token)}')">封 Token</button>`) : ''}
+                                    ${l.ip && l.ip !== '-' ? (ipBanned
+                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 IP</button>`
+                                        : `<button class="btn-ban" data-ban-type="ip" data-ban-value="${escapeHtml(l.ip)}" onclick="banTarget('ip', '${escapeHtml(l.ip)}', this)">封 IP</button>`) : ''}
+                                    ${l.token && l.token !== '-' ? (tokenBanned
+                                        ? `<button class="btn-ban" style="opacity:0.4; cursor:not-allowed;" disabled>已封 Token</button>`
+                                        : `<button class="btn-ban" data-ban-type="token" data-ban-value="${escapeHtml(l.token)}" onclick="banTarget('token', '${escapeHtml(l.token)}', this)">封 Token</button>`) : ''}
                                 </div>
                             </td>
                         </tr>
                     `;
-                }).join('');
+                }, '');
 
                 renderPcPaginationBar(totalPages, totalCount);
             }
         }
 
         function changePcPage(page) {
-            currentPcPage = page;
-            fetchData();
+            currentPcPage = Math.max(1, Number(page) || 1);
+            invalidateLogRequestState();
+            fetchData(true);
         }
 
         function renderPcPaginationBar(totalPages, totalCount) {
@@ -1994,19 +2875,37 @@
 
         function loadMoreMobileLogs(totalCount) {
             mobileDisplayCount += mobileStep;
-            fetchData();
+            invalidateLogRequestState();
+            fetchData(true);
         }
 
         function initializeApp() {
             initTimeSelectOptions();
+            fetchBlacklistRules();
             fetchData();
-            fetchUpstreamDomain();
-            checkCertStatus();
-            setInterval(fetchData, 5000);
+
+            // 【交互防护】给表格/卡片绑定 mouseenter / mouseleave 事件监控
+            const tableCard = document.querySelector('.table-card');
+            if (tableCard) {
+                tableCard.addEventListener('mouseenter', () => { isTableHovered = true; });
+                tableCard.addEventListener('mouseleave', () => { isTableHovered = false; });
+            }
+
+            // 【交互防护】5秒定时器刷新时校验 isUserInteracting，选中文字或鼠标悬停时自动挂起，防止刷新抹掉内容
+            setInterval(() => {
+                if (!isUserInteracting()) {
+                    fetchData();
+                    // 后台同步最新黑名单，其他页面封禁后当前页面按钮也会自动置灰。
+                    fetchBlacklistRules(true);
+                }
+            }, 5000);
         }
 
         window.addEventListener('resize', () => {
-            if (allLogs.length > 0) fetchData();
+            if (allLogs.length > 0) {
+                invalidateLogRequestState();
+                fetchData(true);
+            }
         });
     </script>
 </body>
