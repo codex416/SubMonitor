@@ -1804,8 +1804,13 @@ if (!isAuthorized()) {
                 });
                 const data = await res.json();
                 if (data.status === 'success' || data.code === 200) {
-                    showToast('SSL 证书申请成功！');
-                    checkCertStatus();
+                    showToast('已提交 SSL 申请，正在后台验证并签发证书...');
+                    statusText.innerHTML = '<span style="color:var(--primary-blue);">正在后台申请 SSL 证书，请稍候...</span>';
+                    detailBox.style.display = 'block';
+                    detailBox.innerHTML = '<div>域名已保存。证书签发成功后，系统会自动切换为“仅允许绑定域名访问”模式。</div>';
+                    setTimeout(checkCertStatus, 1500);
+                    setTimeout(checkCertStatus, 5000);
+                    setTimeout(checkCertStatus, 10000);
                 } else {
                     statusText.innerHTML = `申请失败`;
                     detailBox.style.display = 'block';
