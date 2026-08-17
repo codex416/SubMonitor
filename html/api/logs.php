@@ -19,6 +19,8 @@ if (!file_exists($logFile) || !($fp = fopen($logFile, 'r'))) {
         'total_ips'     => 0,
         'total_success' => 0,
         'total_error'   => 0,
+        'total_success_tokens' => 0,
+        'error_rate'   => 0,
         'analytics'     => $emptyAnalytics,
         'page'          => 1,
         'limit'         => 50,
@@ -90,56 +92,54 @@ function queryIpGeo($ip) {
         return '';
     }
 
-    $urls = [
-        'https://ipwho.is/' . rawurlencode($ip) . '?lang=zh-CN',
-        'https://ipapi.co/' . rawurlencode($ip) . '/json/'
-    ];
+    // 使用 ip-api.com：归属地按接口返回原样组合，不做去重；简体中文由 lang=zh-CN 控制。
+    // ISP / org 保持接口原值，不做中文化或修改。
+    $url = 'http://ip-api.com/json/' . rawurlencode($ip) . '?lang=zh-CN&fields=status,message,country,regionName,city,isp,org';
 
-    foreach ($urls as $url) {
-        $body = false;
-        if (function_exists('curl_init')) {
-            $ch = curl_init($url);
-            curl_setopt_array($ch, [
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_CONNECTTIMEOUT => 2,
-                CURLOPT_TIMEOUT => 4,
-                CURLOPT_FOLLOWLOCATION => true,
-                CURLOPT_USERAGENT => 'SubMonitor/1.0',
-                CURLOPT_SSL_VERIFYPEER => true,
-                CURLOPT_SSL_VERIFYHOST => 2
-            ]);
-            $body = curl_exec($ch);
-            curl_close($ch);
-        } else {
-            $ctx = stream_context_create(['http' => ['timeout' => 4, 'ignore_errors' => true]]);
-            $body = @file_get_contents($url, false, $ctx);
-        }
-
-        if (!is_string($body) || $body === '') continue;
-        $data = json_decode($body, true);
-        if (!is_array($data)) continue;
-
-        $success = $data['success'] ?? true;
-        if ($success === false || !empty($data['error'])) continue;
-
-        $country = $data['country'] ?? ($data['country_name'] ?? '');
-        $region  = $data['region'] ?? ($data['region_name'] ?? '');
-        $city    = $data['city'] ?? '';
-        $org     = '';
-        if (isset($data['connection']) && is_array($data['connection'])) {
-            $org = $data['connection']['org'] ?? ($data['connection']['isp'] ?? '');
-        }
-        if ($org === '') $org = $data['org'] ?? ($data['asn'] ?? '');
-
-        $parts = array_filter([$country, $region, $city, $org !== '' ? '(' . $org . ')' : ''], static function ($v) {
-            return trim((string)$v) !== '';
-        });
-        $info = trim(implode(' ', $parts));
-        if ($info !== '') return $info;
+    $body = false;
+    $headers = [];
+    if (function_exists('curl_init')) {
+        $ch = curl_init($url);
+        curl_setopt_array($ch, [
+            CURLOPT_RETURNTRANSFER => true,
+            CURLOPT_CONNECTTIMEOUT => 2,
+            CURLOPT_TIMEOUT => 4,
+            CURLOPT_FOLLOWLOCATION => true,
+            CURLOPT_USERAGENT => 'SubMonitor/1.0',
+            CURLOPT_HTTPHEADER => ['Accept: application/json']
+        ]);
+        $body = curl_exec($ch);
+        curl_close($ch);
+    } else {
+        $ctx = stream_context_create(['http' => [
+            'timeout' => 4,
+            'ignore_errors' => true,
+            'header' => "Accept: application/json\r\nUser-Agent: SubMonitor/1.0\r\n"
+        ]]);
+        $body = @file_get_contents($url, false, $ctx);
     }
 
-    return '';
+    if (!is_string($body) || $body === '') {
+        return '';
+    }
+
+    $data = json_decode($body, true);
+    if (!is_array($data) || ($data['status'] ?? '') !== 'success') {
+        return '';
+    }
+
+    $parts = array_filter([
+        $data['country'] ?? '',
+        $data['regionName'] ?? '',
+        $data['city'] ?? '',
+        !empty($data['isp']) ? '(' . $data['isp'] . ')' : ''
+    ], static function ($v) {
+        return trim((string)$v) !== '';
+    });
+
+    return trim(implode(' ', $parts));
 }
+
 // 1. 全局基础解析与提取
 $allParsedLines = [];
 foreach ($lines as $line) {
@@ -315,6 +315,7 @@ $filteredLines = [];
 $globalIps = [];
 $totalSuccess = 0;
 $totalError = 0;
+$totalSuccessTokens = [];
 
 foreach ($allParsedLines as $item) {
     $formattedTime = $item['time'];
@@ -349,6 +350,9 @@ foreach ($allParsedLines as $item) {
     $globalIps[$item['ip']] = true;
     if ($item['status'] === '200') {
         $totalSuccess++;
+        if ($item['token'] && $item['token'] !== '-') {
+            $totalSuccessTokens[$item['token']] = true;
+        }
     } else {
         $totalError++;
     }
@@ -365,6 +369,8 @@ foreach ($allParsedLines as $item) {
 
 $total = count($filteredLines);
 $totalIps = count($globalIps);
+$totalSuccessTokenCount = count($totalSuccessTokens);
+$errorRate = $total > 0 ? round(($totalError / $total) * 100, 1) : 0;
 
 // 4. 分页切片
 $page = isset($_GET['page']) ? max(1, intval($_GET['page'])) : 1;
@@ -377,6 +383,8 @@ echo json_encode([
     'total_ips'     => $totalIps,      // 当前条件下的独立 IP 数
     'total_success' => $totalSuccess,  // 当前条件下的成功数
     'total_error'   => $totalError,    // 当前条件下的异常拦截数
+    'total_success_tokens' => $totalSuccessTokenCount, // 当前条件下 HTTP 200 的去重 Token 数
+    'error_rate'   => $errorRate,      // 当前条件下异常率（%）
     'analytics'     => $analytics,     // 全局分析卡片数据
     'page'          => $page,
     'limit'         => $limit,
