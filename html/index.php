@@ -246,9 +246,11 @@ if (!isAuthorized()) {
             font-size: 0.75rem;
             font-weight: 700;
             color: var(--text-muted);
-            width: 14px;
+            width: 28px;
+            min-width: 28px;
             text-align: center;
-            flex-shrink: 0;
+            flex: 0 0 28px;
+            font-variant-numeric: tabular-nums;
         }
 
         .item-main {
@@ -296,14 +298,29 @@ if (!isAuthorized()) {
 
         .stats-grid {
             display: grid;
-            grid-template-columns: repeat(4, 1fr);
+            grid-template-columns: repeat(3, 1fr);
             gap: 10px;
             margin-bottom: 20px;
+        }
+
+        /* PC端统计卡片排列：第一行 总请求节点｜成功请求｜异常 / 拦截
+           第二行 独立 IP 数｜活跃TOKEN｜异常率 */
+        @media (min-width: 641px) {
+            .stats-grid .stat-card:nth-child(1) { order: 1; }
+            .stats-grid .stat-card:nth-child(2) { order: 4; }
+            .stats-grid .stat-card:nth-child(3) { order: 2; }
+            .stats-grid .stat-card:nth-child(4) { order: 3; }
+            .stats-grid .stat-card:nth-child(5) { order: 5; }
+            .stats-grid .stat-card:nth-child(6) { order: 6; }
         }
 
         @media (max-width: 640px) {
             .stats-grid {
                 grid-template-columns: repeat(2, 1fr);
+            }
+
+            .stats-grid .stat-card {
+                order: initial;
             }
         }
 
@@ -852,6 +869,15 @@ if (!isAuthorized()) {
         .analytics-page-ellipsis { padding: 0 2px; color: var(--text-muted); }
         @media (max-width: 640px) {
             .analytics-pagination-bar { font-size: 0.68rem; }
+            .analytics-pagination-info {
+                display: flex !important;
+                align-items: center;
+                justify-content: flex-start;
+                text-align: left;
+                margin-right: auto;
+                flex: 0 0 auto;
+            }
+
             .analytics-pagination-nums { gap: 3px; }
             .analytics-page-btn { min-width: 26px; padding: 3px 6px; }
         }
@@ -1230,6 +1256,16 @@ if (!isAuthorized()) {
             display: flex;
             align-items: center;
             gap: 4px;
+            min-width: 0;
+            flex-shrink: 1;
+            overflow: hidden;
+        }
+
+        .analytics-pagination-info {
+            flex: 0 1 auto;
+            min-width: 0;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         /* 与监控日志列表分页按钮统一：透明底、边框、圆角、激活态 */
@@ -1275,14 +1311,23 @@ if (!isAuthorized()) {
         /* 移动端：四个分析卡片不出现内部滚动条 */
         @media (max-width: 768px) {
             .analytics-card {
-                overflow: hidden;
+                position: relative !important;
+                overflow: hidden !important;
+                height: 400px !important;
+                min-height: 400px !important;
+                box-sizing: border-box !important;
+                display: flex !important;
+                flex-direction: column !important;
+                padding-bottom: 52px !important;
             }
 
             .analytics-card .analytics-list {
                 overflow-y: auto !important;
                 overflow-x: hidden !important;
-                max-height: 320px !important;
+                max-height: none !important;
                 height: auto !important;
+                flex: 1 1 auto !important;
+                min-height: 0 !important;
 
                 /* 保留触摸滑动/滚动，但隐藏可见滚动条 */
                 -webkit-overflow-scrolling: touch;
@@ -1296,25 +1341,69 @@ if (!isAuthorized()) {
                 display: none;
             }
 
+            /* 移动端分页：只调整移动端，强制分页栏始终限制在卡片内容宽度内 */
             .analytics-pagination-bar {
-                width: calc(100% + 24px);
-                min-height: 40px;
-                margin-left: -12px;
-                margin-right: -12px;
-                margin-bottom: -12px;
-                padding: 0 12px;
+                position: absolute !important;
+                left: 0 !important;
+                right: 0 !important;
+                bottom: 0 !important;
+                width: 100% !important;
+                max-width: none !important;
+                min-width: 0 !important;
+                height: 40px !important;
+                min-height: 40px !important;
+                margin: 0 !important;
+                justify-content: space-between !important;
+                padding: 0 16px !important;
+                box-sizing: border-box !important;
+                align-items: center !important;
+                flex: none !important;
+                overflow: hidden !important;
                 font-size: 0.70rem;
+                z-index: 2;
+            }
+
+            .analytics-pagination-info {
+                display: flex !important;
+                align-items: center;
+                flex: 0 1 auto;
+                margin-left: 0 !important;
+                min-width: 0;
+                max-width: 46%;
+                overflow: hidden;
+                white-space: nowrap;
+                text-overflow: ellipsis;
+                padding: 0 4px;
             }
 
             .analytics-pagination-nums {
+                display: flex !important;
+                align-items: center;
+                margin-right: 0 !important;
+                justify-content: center;
                 gap: 2px;
+                flex: 0 1 auto;
+                min-width: 0;
+                max-width: 100%;
+                overflow: hidden;
+                white-space: nowrap;
             }
 
             .analytics-page-btn {
-                min-width: 28px;
+                flex: 0 0 26px;
+                width: 26px;
+                min-width: 26px;
+                max-width: 26px;
                 height: 28px;
-                padding: 0 7px;
+                padding: 0;
                 font-size: 0.70rem;
+                box-sizing: border-box;
+            }
+
+            .analytics-page-ellipsis {
+                flex: 0 0 auto;
+                padding: 0 1px;
+                line-height: 28px;
             }
         }
 
@@ -1361,6 +1450,14 @@ if (!isAuthorized()) {
             <div class="stat-card">
                 <div class="stat-label">异常 / 拦截</div>
                 <div class="stat-number red" id="stat-error">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">活跃TOKEN</div>
+                <div class="stat-number green" id="stat-success-tokens">0</div>
+            </div>
+            <div class="stat-card">
+                <div class="stat-label">异常率</div>
+                <div class="stat-number red" id="stat-error-rate">0%</div>
             </div>
         </div>
 
@@ -1891,7 +1988,10 @@ if (!isAuthorized()) {
         function fillZeroStart() {
             const now = new Date();
             const p = getTimeZoneParts(now);
-            setModalPickerValues('start', new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day))));
+            document.getElementById('m-start-date').value = `${p.year}-${p.month}-${p.day}`;
+            document.getElementById('m-start-hour').value = '00';
+            document.getElementById('m-start-minute').value = '00';
+            document.getElementById('m-start-second').value = '00';
         }
 
         function fillNowEnd() {
@@ -1901,7 +2001,6 @@ if (!isAuthorized()) {
         function openTimeModal() {
             const now = new Date();
             const p = getTimeZoneParts(now);
-            const startOfToday = new Date(Date.UTC(Number(p.year), Number(p.month) - 1, Number(p.day)));
 
             if (lockedStartTime) {
                 const parts = lockedStartTime.split(' ');
@@ -1913,7 +2012,10 @@ if (!isAuthorized()) {
                     document.getElementById('m-start-second').value = tParts[2] || '00';
                 }
             } else {
-                setModalPickerValues('start', startOfToday);
+                document.getElementById('m-start-date').value = `${p.year}-${p.month}-${p.day}`;
+                document.getElementById('m-start-hour').value = '00';
+                document.getElementById('m-start-minute').value = '00';
+                document.getElementById('m-start-second').value = '00';
             }
 
             if (lockedEndTime) {
@@ -2485,6 +2587,8 @@ if (!isAuthorized()) {
                 document.getElementById('stat-ips').innerText = responseData.total_ips || 0;
                 document.getElementById('stat-success').innerText = responseData.total_success || 0;
                 document.getElementById('stat-error').innerText = responseData.total_error || 0;
+                document.getElementById('stat-success-tokens').innerText = responseData.total_success_tokens || 0;
+                document.getElementById('stat-error-rate').innerText = (responseData.error_rate || 0) + '%';
             } else {
                 document.getElementById('stat-total').innerText = logs.length;
                 const ips = new Set(logs.map(l => l.ip).filter(Boolean));
@@ -2492,6 +2596,9 @@ if (!isAuthorized()) {
                 const success = logs.filter(l => String(l.status) === '200').length;
                 document.getElementById('stat-success').innerText = success;
                 document.getElementById('stat-error').innerText = logs.length - success;
+                const successTokens = new Set(logs.filter(l => String(l.status) === '200' && l.token && l.token !== '-').map(l => l.token));
+                document.getElementById('stat-success-tokens').innerText = successTokens.size;
+                document.getElementById('stat-error-rate').innerText = (logs.length ? (((logs.length - success) / logs.length) * 100).toFixed(1) : '0') + '%';
             }
         }
 
@@ -2526,23 +2633,79 @@ if (!isAuthorized()) {
         function renderAnalyticsPagination(key, currentPage, totalPages, totalCount) {
             let pagesHtml = '';
 
-            for (let i = 1; i <= totalPages; i++) {
-                if (i === 1 || i === totalPages || (i >= currentPage - 2 && i <= currentPage + 2)) {
-                    pagesHtml += `<button class="analytics-page-btn ${i === currentPage ? 'active' : ''}" onclick="changeAnalyticsPage('${key}', ${i})">${i}</button>`;
-                } else if (i === currentPage - 3 || i === currentPage + 3) {
-                    pagesHtml += '<span class="analytics-page-ellipsis">...</span>';
-                }
+            // 保持原来的 PC 分页样式，只根据卡片实际宽度减少页码数量，避免卡片过窄时溢出。
+            // 移动端同样采用有限页码窗口，但不改变原来的分页栏结构和按钮样式。
+            const listIdMap = {
+                topIp: 'list-top-ip',
+                topToken: 'list-top-token',
+                susToken: 'list-sus-token',
+                susIp: 'list-sus-ip'
+            };
+            const listEl = document.getElementById(listIdMap[key]);
+            const card = listEl ? listEl.closest('.analytics-card') : null;
+            const cardWidth = card ? card.getBoundingClientRect().width : window.innerWidth;
+            const isMobile = window.innerWidth <= 768;
+
+            // 根据分页栏实际可用宽度限制页码数量。
+            // 关键点：页码数量必须把“上一页/下一页”和 PC 左侧统计信息的空间一起算进去，
+            // 不能只看卡片总宽度，否则卡片较窄时仍会发生横向溢出。
+            let maxVisiblePages;
+            if (isMobile) {
+                // 移动端只显示最紧凑的页码窗口，避免任何手机宽度下分页栏溢出。
+                // PC 分支完全保持不变。
+                maxVisiblePages = 3;
+            } else {
+                // PC 保留原来的统计信息；卡片越窄，页码窗口越小。
+                // 3/5/7 指“数字页码”的最大数量，不包含上一页/下一页。
+                maxVisiblePages = cardWidth < 430 ? 3 : (cardWidth < 600 ? 5 : 7);
             }
+
+            const addPage = (page) => {
+                pagesHtml += `<button class="analytics-page-btn ${page === currentPage ? 'active' : ''}" onclick="changeAnalyticsPage('${key}', ${page})">${page}</button>`;
+            };
+            const addEllipsis = () => {
+                pagesHtml += '<span class="analytics-page-ellipsis">...</span>';
+            };
+
+            if (totalPages <= maxVisiblePages) {
+                for (let i = 1; i <= totalPages; i++) addPage(i);
+            } else if (maxVisiblePages === 3) {
+                addPage(1);
+                if (currentPage > 2 && currentPage < totalPages - 1) addEllipsis();
+                if (currentPage !== 1 && currentPage !== totalPages) addPage(currentPage);
+                if (currentPage < totalPages - 1) addEllipsis();
+                addPage(totalPages);
+            } else {
+                const radius = maxVisiblePages === 7 ? 2 : 1;
+                const middleSlots = maxVisiblePages - 2;
+                let start = Math.max(2, currentPage - radius);
+                let end = Math.min(totalPages - 1, currentPage + radius);
+
+                while (end - start + 1 < middleSlots) {
+                    if (start > 2) start--;
+                    else if (end < totalPages - 1) end++;
+                    else break;
+                }
+
+                addPage(1);
+                if (start > 2) addEllipsis();
+                for (let i = start; i <= end; i++) addPage(i);
+                if (end < totalPages - 1) addEllipsis();
+                addPage(totalPages);
+            }
+
+            const prevLabel = isMobile ? '‹' : '上一页';
+            const nextLabel = isMobile ? '›' : '下一页';
 
             return `
                 <div class="analytics-pagination-bar">
                     <div class="analytics-pagination-info">
-                        共 <strong>${totalCount}</strong> 条记录，当前第 <strong>${currentPage}/${totalPages}</strong> 页
+                        共 <strong>${totalCount}</strong> 条记录${isMobile ? '' : `，当前第 <strong>${currentPage}/${totalPages}</strong> 页`}
                     </div>
                     <div class="analytics-pagination-nums">
-                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>上一页</button>
+                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>${prevLabel}</button>
                         ${pagesHtml}
-                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>下一页</button>
+                        <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage + 1})" ${currentPage >= totalPages ? 'disabled' : ''}>${nextLabel}</button>
                     </div>
                 </div>`;
         }
