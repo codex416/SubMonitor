@@ -1179,6 +1179,200 @@ unset($trendTokenSets);
             }
         }
 
+        /* 手机横屏专用：监控日志列表继续使用移动端卡片布局。
+           只处理日志列表，不改变四个分析卡片和PC正常宽度下的布局。 */
+        @media (min-width: 769px) and (max-width: 1024px) and (orientation: landscape) and (pointer: coarse) {
+            /* 时间筛选卡片与日志列表必须明确分隔。
+               横屏宽度 > 768px 时不会进入 max-width:768px 的移动端规则，
+               因此这里单独补上底部间距，避免首张日志卡片贴入/覆盖筛选卡片。 */
+            .control-panel {
+                margin-bottom: 12px !important;
+                border-bottom: 1px solid var(--border) !important;
+                border-radius: 12px !important;
+                position: relative !important;
+                z-index: 1 !important;
+                box-sizing: border-box !important;
+            }
+
+            .table-card {
+                margin-top: 0 !important;
+                position: relative !important;
+                z-index: 0 !important;
+                background: transparent;
+                border: none;
+                box-shadow: none;
+                overflow: hidden;
+                width: 100%;
+            }
+
+            .table-wrapper {
+                overflow: hidden;
+                width: 100%;
+            }
+
+            /* 横屏时强制 table 本身脱离 table 布局，
+               避免 tbody/flex 与原生 table 行高计算冲突导致卡片重叠。 */
+            #desktop-table {
+                display: block !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                box-sizing: border-box !important;
+                border-collapse: separate !important;
+            }
+
+            #desktop-table tbody {
+                display: flex !important;
+                flex-direction: column !important;
+                gap: 10px !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                box-sizing: border-box !important;
+            }
+
+            #desktop-table thead {
+                display: none !important;
+            }
+
+            #desktop-table tr.m-card {
+                display: block !important;
+                position: relative !important;
+                flex: 0 0 auto !important;
+                margin-top: 0 !important;
+                width: 100% !important;
+                height: auto !important;
+                min-height: 0 !important;
+                margin: 0 !important;
+                box-sizing: border-box !important;
+                background: var(--card-bg) !important;
+                border: 1px solid var(--border) !important;
+                border-radius: 12px !important;
+                padding: 12px !important;
+                overflow: hidden !important;
+            }
+
+            #desktop-table tr.m-card > td {
+                display: block !important;
+                width: 100% !important;
+                padding: 0 !important;
+                border: none !important;
+                background: transparent !important;
+                box-sizing: border-box !important;
+                overflow: hidden !important;
+            }
+
+            #desktop-table .m-card-header {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                gap: 10px;
+                padding-bottom: 8px;
+                margin-bottom: 8px;
+                border-bottom: 1px solid #f1f5f9;
+                width: 100%;
+            }
+
+            #desktop-table .m-time {
+                font-size: 0.78rem;
+                font-weight: 600;
+                color: #334155;
+                min-width: 0;
+                overflow: hidden;
+                text-overflow: ellipsis;
+                white-space: nowrap;
+            }
+
+            #desktop-table .m-status-group {
+                display: flex;
+                align-items: center;
+                gap: 5px;
+                flex-shrink: 0;
+                white-space: nowrap;
+            }
+
+            #desktop-table .m-card-body {
+                display: flex;
+                flex-direction: column;
+                gap: 8px;
+                width: 100%;
+            }
+
+            #desktop-table .m-row {
+                display: flex !important;
+                justify-content: space-between !important;
+                align-items: flex-start !important;
+                gap: 8px !important;
+                width: 100% !important;
+                box-sizing: border-box !important;
+            }
+
+            #desktop-table .m-label {
+                font-size: 0.74rem;
+                font-weight: 600;
+                color: var(--text-muted);
+                flex: 0 0 auto;
+                margin-top: 3px;
+            }
+
+            #desktop-table .m-value {
+                font-size: 0.79rem;
+                display: flex !important;
+                flex-direction: column !important;
+                align-items: flex-end !important;
+                text-align: right !important;
+                min-width: 0 !important;
+                max-width: 82% !important;
+                box-sizing: border-box;
+            }
+
+            #desktop-table .m-value > div {
+                max-width: 100%;
+                justify-content: flex-end;
+            }
+
+            #desktop-table .pill-box {
+                max-width: min(100%, 560px);
+            }
+
+            #desktop-table .ip-sub {
+                font-size: 0.71rem;
+                width: 100% !important;
+                margin-top: 3px;
+                text-align: right !important;
+                white-space: nowrap !important;
+                overflow: hidden !important;
+                text-overflow: ellipsis !important;
+            }
+
+            #desktop-table .m-ua-box {
+                margin-top: 8px;
+                padding-top: 7px;
+                border-top: 1px dashed #f1f5f9;
+                /* 与竖屏移动端 UA 保持相同的字体比例和颜色风格 */
+                font-size: 0.72rem;
+                line-height: 1.35;
+                color: var(--text-muted);
+                word-break: break-all !important;
+                overflow-wrap: anywhere !important;
+                display: -webkit-box;
+                -webkit-line-clamp: 2;
+                -webkit-box-orient: vertical;
+                overflow: hidden;
+                width: 100% !important;
+                text-align: left !important;
+            }
+
+            #desktop-table .m-ua-box.expanded {
+                display: block !important;
+                overflow: visible !important;
+            }
+
+            #pc-pagination-container {
+                display: none;
+            }
+        }
+
         .toast {
             position: fixed;
             bottom: 24px;
@@ -1231,6 +1425,10 @@ unset($trendTokenSets);
             align-items: center;
             white-space: nowrap;
             padding: 0 8px;
+            min-width: 0;
+            flex: 1 1 auto;
+            overflow: hidden;
+            text-overflow: ellipsis;
         }
 
         .analytics-pagination-nums {
@@ -1238,6 +1436,27 @@ unset($trendTokenSets);
             align-items: stretch;
             justify-content: flex-end;
             gap: 3px;
+            flex: 0 0 auto;
+            min-width: 0;
+        }
+
+        .analytics-pagination-bar.compact .analytics-pagination-info {
+            flex: 0 1 34%;
+            max-width: 34%;
+            padding: 0 4px;
+        }
+
+        .analytics-pagination-bar.compact .analytics-pagination-nums {
+            flex: 0 0 auto;
+            gap: 2px;
+        }
+
+        .analytics-pagination-bar.compact .analytics-page-btn {
+            flex: 0 0 28px;
+            width: 28px;
+            min-width: 28px;
+            max-width: 28px;
+            padding: 0;
         }
 
         .analytics-page-btn {
@@ -1886,6 +2105,13 @@ unset($trendTokenSets);
         let mobileDisplayCount = 20;
         const mobileStep = 20;
         let searchDebounceTimer = null;
+
+        // 监控日志列表的移动端布局：手机横屏时宽度可能超过768px，
+        // 但仍应使用移动端卡片布局，避免误进入PC表格布局导致横屏显示凌乱。
+        function isLogMobileLayout() {
+            return window.innerWidth <= 768 ||
+                (window.innerWidth <= 1024 && window.matchMedia('(pointer: coarse)').matches);
+        }
 
         // 【交互防护】记录用户是否正与表格建立交互（鼠标悬停 / 文本选中）
         let isTableHovered = false;
@@ -2593,7 +2819,7 @@ unset($trendTokenSets);
         }
 
         function getCurrentFilterContext() {
-            const isMobile = window.innerWidth <= 768;
+            const isMobile = isLogMobileLayout();
             const searchVal = (document.getElementById('search')?.value || '').trim();
             return JSON.stringify({
                 search: searchVal,
@@ -2627,7 +2853,7 @@ unset($trendTokenSets);
             activeFetchContext = requestContext;
 
             try {
-                const isMobile = window.innerWidth <= 768;
+                const isMobile = isLogMobileLayout();
                 const searchVal = (document.getElementById('search')?.value || '').trim();
                 const fetchLimit = isMobile ? mobileDisplayCount : pcPageSize;
                 const fetchPage = isMobile ? 1 : currentPcPage;
@@ -2863,14 +3089,69 @@ unset($trendTokenSets);
                     const d = Math.abs(x - p.x);
                     if (d < distance) { distance = d; nearest = p; }
                 });
-                if (distance > 16) { tip.style.display = 'none'; return; }
+                if (distance > 16) {
+                    if (!canvas._activeTokenTrendTipPinned) tip.style.display = 'none';
+                    return;
+                }
+                if (canvas._activeTokenTrendTipPinned) return;
                 const idx = points.indexOf(nearest);
                 tip.textContent = `${canvas._activeTokenTrendLabels[idx]}：${nearest.value} 个活跃TOKEN`;
                 tip.style.display = 'block';
                 tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px';
                 tip.style.top = Math.max(8, e.clientY - 38) + 'px';
             });
-            canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+            canvas.addEventListener('mouseleave', () => {
+                // 鼠标离开图表时隐藏悬浮提示。
+                tip.style.display = 'none';
+            });
+
+            // 点击趋势图数据点后固定显示详细信息。
+            // 再点击图表外的任意位置时关闭，移动端/横屏触摸操作同样适用。
+            canvas.addEventListener('click', e => {
+                const points = canvas._activeTokenTrendPoints || [];
+                if (!points.length) return;
+
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                let nearest = points[0];
+                let distance = Math.abs(x - points[0].x);
+
+                points.forEach(p => {
+                    const d = Math.abs(x - p.x);
+                    if (d < distance) {
+                        distance = d;
+                        nearest = p;
+                    }
+                });
+
+                if (distance > 20) {
+                    tip.style.display = 'none';
+                    return;
+                }
+
+                const idx = points.indexOf(nearest);
+                tip.textContent = `${canvas._activeTokenTrendLabels[idx]}：${nearest.value} 个活跃TOKEN`;
+                tip.style.display = 'block';
+
+                const tipLeft = Math.min(
+                    e.clientX + 12,
+                    window.innerWidth - tip.offsetWidth - 8
+                );
+                const tipTop = Math.max(8, e.clientY - 38);
+
+                tip.style.left = Math.max(8, tipLeft) + 'px';
+                tip.style.top = tipTop + 'px';
+
+                // 标记为点击固定状态，避免 mousemove 在桌面端立即覆盖/隐藏。
+                canvas._activeTokenTrendTipPinned = true;
+            });
+
+            // 点击图表以外的任意地方，关闭已经点击显示的趋势详情。
+            document.addEventListener('click', e => {
+                if (e.target === canvas || canvas.contains(e.target)) return;
+                tip.style.display = 'none';
+                canvas._activeTokenTrendTipPinned = false;
+            });
         }
 
         function renderAnalyticsCards(analyticsData) {
@@ -2917,16 +3198,19 @@ unset($trendTokenSets);
             const cardWidth = card ? card.getBoundingClientRect().width : window.innerWidth;
             const isMobile = window.innerWidth <= 768;
 
+            // 以卡片实际宽度判断分页是否进入紧凑模式。
+            // 这样手机横屏、平板横屏以及 PC 缩小窗口时也不会继续显示“当前第 X/Y 页”并挤压页码。
+            const isCompact = cardWidth < 520;
+
             // 根据分页栏实际可用宽度限制页码数量。
-            // 关键点：页码数量必须把“上一页/下一页”和 PC 左侧统计信息的空间一起算进去，
+            // 关键点：页码数量必须把“上一页/下一页”和统计信息的空间一起算进去，
             // 不能只看卡片总宽度，否则卡片较窄时仍会发生横向溢出。
             let maxVisiblePages;
-            if (isMobile) {
-                // 移动端只显示最紧凑的页码窗口，避免任何手机宽度下分页栏溢出。
-                // PC 分支完全保持不变。
+            if (isCompact || isMobile) {
+                // 紧凑模式只显示最少的页码窗口，避免窄卡片横向挤压。
                 maxVisiblePages = 3;
             } else {
-                // PC 保留原来的统计信息；卡片越窄，页码窗口越小。
+                // PC 卡片越窄，页码窗口越小。
                 // 3/5/7 指“数字页码”的最大数量，不包含上一页/下一页。
                 maxVisiblePages = cardWidth < 430 ? 3 : (cardWidth < 600 ? 5 : 7);
             }
@@ -2965,13 +3249,13 @@ unset($trendTokenSets);
                 addPage(totalPages);
             }
 
-            const prevLabel = isMobile ? '‹' : '上一页';
-            const nextLabel = isMobile ? '›' : '下一页';
+            const prevLabel = (isMobile || isCompact) ? '‹' : '上一页';
+            const nextLabel = (isMobile || isCompact) ? '›' : '下一页';
 
             return `
-                <div class="analytics-pagination-bar">
+                <div class="analytics-pagination-bar${isCompact ? ' compact' : ''}">
                     <div class="analytics-pagination-info">
-                        共 <strong>${totalCount}</strong> 条记录${isMobile ? '' : `，当前第 <strong>${currentPage}/${totalPages}</strong> 页`}
+                        共 <strong>${totalCount}</strong> 条记录${(isMobile || isCompact) ? '' : `，当前第 <strong>${currentPage}/${totalPages}</strong> 页`}
                     </div>
                     <div class="analytics-pagination-nums">
                         <button class="analytics-page-btn" onclick="changeAnalyticsPage('${key}', ${currentPage - 1})" ${currentPage <= 1 ? 'disabled' : ''}>${prevLabel}</button>
@@ -3156,7 +3440,7 @@ unset($trendTokenSets);
                 return;
             }
 
-            const isMobile = window.innerWidth <= 768;
+            const isMobile = isLogMobileLayout();
 
             const isIpBanned = (ip) => ip && ip !== '-' && (currentBlData.ip || []).includes(ip);
             const isTokenBanned = (token) => token && token !== '-' && (currentBlData.token || []).includes(token);
