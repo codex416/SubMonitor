@@ -1,5 +1,11 @@
 <?php
 session_start();
+
+// 禁止浏览器缓存控制面板，确保登录状态失效后刷新不会继续显示旧页面
+header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+header('Pragma: no-cache');
+header('Expires: 0');
+
 define('SESSION_EXPIRE', 86400);
 define('BIND_CLIENT_INFO', false); 
 
@@ -37,6 +43,31 @@ if (!isAuthorized()) {
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
+    <script>
+        // 登录状态失效时，刷新/加载控制面板立即返回登录页
+        (async function () {
+            try {
+                const res = await fetch('/api/check_status.php?_ts=' + Date.now(), {
+                    method: 'GET',
+                    cache: 'no-store',
+                    credentials: 'same-origin',
+                    headers: { 'Accept': 'application/json' }
+                });
+                if (res.status === 401) {
+                    window.location.replace('/login.html');
+                    return;
+                }
+                if (res.ok) {
+                    const data = await res.json().catch(() => null);
+                    if (data && (data.code === 401 || data.status === 401 || data.authenticated === false || data.logged_in === false)) {
+                        window.location.replace('/login.html');
+                    }
+                }
+            } catch (e) {
+                // 检查接口暂时不可用时不强制退出，避免网络抖动导致误跳转。
+            }
+        })();
+    </script>
     <title>SubMonitor - 订阅监控</title>
     
     <style>
