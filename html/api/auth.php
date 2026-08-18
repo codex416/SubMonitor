@@ -3,9 +3,17 @@ if (session_status() === PHP_SESSION_NONE) {
     session_start();
 }
 
-// 保持与 login.php 一致的会话过期时间 (24小时)
-if (!isset($_SESSION['login_time']) || time() - $_SESSION['login_time'] > 86400) {
-    $_SESSION['is_logged_in'] = false;
+// 会话策略：2小时无操作失效，最长登录7天
+define('SESSION_IDLE_EXPIRE', 7200);
+define('SESSION_ABSOLUTE_EXPIRE', 604800);
+
+if (isset($_SESSION['is_logged_in']) && $_SESSION['is_logged_in'] === true) {
+    $now = time();
+    $loginTime = (int)($_SESSION['login_time'] ?? 0);
+    $lastActivity = (int)($_SESSION['last_activity'] ?? $loginTime);
+    if ($loginTime <= 0 || ($now - $loginTime) >= SESSION_ABSOLUTE_EXPIRE || ($now - $lastActivity) >= SESSION_IDLE_EXPIRE) {
+        $_SESSION['is_logged_in'] = false;
+    }
 }
 
 function is_logged_in(): bool {
@@ -24,6 +32,7 @@ function require_login(): void {
         http_response_code(401);
         json_return(['status'=>'error','message'=>'请先登录或会话已过期'], 401);
     }
+    $_SESSION['last_activity'] = time();
 }
 
 function json_return($data, $code=200) {
