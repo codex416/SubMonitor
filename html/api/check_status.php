@@ -4,7 +4,8 @@ session_start();
 header('Content-Type: application/json; charset=utf-8');
 
 // 与 login.php 保持一致的配置
-define('SESSION_EXPIRE', 86400);
+define('SESSION_IDLE_EXPIRE', 7200);
+define('SESSION_ABSOLUTE_EXPIRE', 604800);
 define('BIND_CLIENT_INFO', true);
 
 /**
@@ -14,7 +15,9 @@ function isAuthorized() {
     $baseCheck = isset($_SESSION['is_logged_in'])
         && $_SESSION['is_logged_in'] === true
         && isset($_SESSION['login_time'])
-        && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+        && isset($_SESSION['last_activity'])
+        && (time() - $_SESSION['login_time']) < SESSION_ABSOLUTE_EXPIRE
+        && (time() - $_SESSION['last_activity']) < SESSION_IDLE_EXPIRE;
     if (!$baseCheck) return false;
 
     if (BIND_CLIENT_INFO) {
@@ -29,7 +32,10 @@ function isAuthorized() {
 // 主逻辑：查询系统/登录状态
 // ======================================
 if (isAuthorized()) {
-    $remain = SESSION_EXPIRE - (time() - ($_SESSION['login_time'] ?? time()));
+    $_SESSION['last_activity'] = time();
+    $idleRemain = SESSION_IDLE_EXPIRE - (time() - ($_SESSION['last_activity'] ?? time()));
+    $absoluteRemain = SESSION_ABSOLUTE_EXPIRE - (time() - ($_SESSION['login_time'] ?? time()));
+    $remain = min($idleRemain, $absoluteRemain);
     http_response_code(200);
     echo json_encode([
         'code' => 200,
