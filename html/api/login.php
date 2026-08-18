@@ -4,7 +4,8 @@ header('Content-Type: application/json; charset=utf-8');
 
 // 配置
 define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
-define('SESSION_EXPIRE', 86400);
+define('SESSION_IDLE_EXPIRE', 7200);
+define('SESSION_ABSOLUTE_EXPIRE', 604800);
 define('BIND_CLIENT_INFO', false);
 
 // 读取密码
@@ -31,6 +32,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
     if ($inputPassword === $currentPassword) {
         $_SESSION['is_logged_in'] = true;
         $_SESSION['login_time'] = time();
+        $_SESSION['last_activity'] = time();
         // 无论是否开启绑定，登录时都记录 IP 和 UA
         $_SESSION['client_ip'] = $_SERVER['REMOTE_ADDR'] ?? '';
         $_SESSION['client_ua'] = $_SERVER['HTTP_USER_AGENT'] ?? '';
@@ -46,12 +48,16 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['password'])) {
 }
 
 function isAuthorized() {
-    global $currentPassword;
+    $now = time();
+    $loginTime = (int)($_SESSION['login_time'] ?? 0);
+    $lastActivity = (int)($_SESSION['last_activity'] ?? $loginTime);
     $baseCheck = isset($_SESSION['is_logged_in']) && $_SESSION['is_logged_in'] === true
-        && isset($_SESSION['login_time']) && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+        && $loginTime > 0
+        && ($now - $loginTime) < SESSION_ABSOLUTE_EXPIRE
+        && ($now - $lastActivity) < SESSION_IDLE_EXPIRE;
     if (!$baseCheck) return false;
     if (BIND_CLIENT_INFO) {
-        return ($_SESSION['client_ip'] ?? '') === ($_SERVER['REMOTE_ADDR'] ?? '') 
+        return ($_SESSION['client_ip'] ?? '') === ($_SERVER['REMOTE_ADDR'] ?? '')
             && ($_SESSION['client_ua'] ?? '') === ($_SERVER['HTTP_USER_AGENT'] ?? '');
     }
     return true;
