@@ -1,49 +1,33 @@
 <?php
+session_set_cookie_params(604800);
 session_start();
-define('SESSION_IDLE_EXPIRE', 7200);
-define('SESSION_ABSOLUTE_EXPIRE', 604800);
-define('BIND_CLIENT_INFO', false);
+define('SESSION_EXPIRE', 86400);
+define('BIND_CLIENT_INFO', false); 
 
 function isAuthorized() {
-    $now = time();
-    $loginTime = (int)($_SESSION['login_time'] ?? 0);
-    $lastActivity = (int)($_SESSION['last_activity'] ?? $loginTime);
-
     $baseCheck = isset($_SESSION['is_logged_in'])
         && $_SESSION['is_logged_in'] === true
-        && $loginTime > 0
-        && ($now - $loginTime) < SESSION_ABSOLUTE_EXPIRE
-        && ($now - $lastActivity) < SESSION_IDLE_EXPIRE;
-
+        && isset($_SESSION['login_time'])
+        && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+        
     if (!$baseCheck) return false;
 
     if (BIND_CLIENT_INFO) {
         $sessionIp = $_SESSION['client_ip'] ?? $_SESSION['user_ip'] ?? '';
         $sessionUa = $_SESSION['client_ua'] ?? $_SESSION['user_ua'] ?? '';
+        
         $currentIp = $_SERVER['REMOTE_ADDR'] ?? '';
         $currentUa = $_SERVER['HTTP_USER_AGENT'] ?? '';
+        
         return ($sessionIp === $currentIp) && ($sessionUa === $currentUa);
     }
-
     return true;
 }
 
 if (!isAuthorized()) {
-    $_SESSION = [];
-    if (ini_get('session.use_cookies')) {
-        $params = session_get_cookie_params();
-        setcookie(session_name(), '', time() - 42000,
-            $params['path'], $params['domain'],
-            $params['secure'], $params['httponly']
-        );
-    }
-    session_destroy();
     header('Location: /login.html', true, 302);
     exit;
 }
-
-// 当前页面访问本身视为一次有效活动；绝对过期时间不延长。
-$_SESSION['last_activity'] = time();
 
 // 活跃 TOKEN 趋势：当前自然月，按当月实际天数每天统计 HTTP 200 请求中的独立 TOKEN。
 // 仅用于趋势图，不改变现有日志统计、筛选或分页逻辑。
