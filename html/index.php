@@ -391,7 +391,7 @@ unset($trendTokenSets);
         }
 
         /* PC端统计卡片排列：第一行 总请求节点｜成功请求｜异常 / 拦截
-           第二行 独立 IP 数｜活跃TOKEN｜异常率 */
+           第二行 独立 IP 数｜独立 TOKEN｜异常率 */
         @media (min-width: 641px) {
             .stats-grid .stat-card:nth-child(1) { order: 1; }
             .stats-grid .stat-card:nth-child(2) { order: 4; }
@@ -1817,7 +1817,7 @@ unset($trendTokenSets);
                 <div class="stat-number red" id="stat-error">0</div>
             </div>
             <div class="stat-card">
-                <div class="stat-label">活跃TOKEN</div>
+                <div class="stat-label">独立 TOKEN</div>
                 <div class="stat-number green" id="stat-success-tokens">0</div>
             </div>
             <div class="stat-card">
