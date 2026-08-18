@@ -5,13 +5,16 @@ header('Content-Type: application/json; charset=utf-8');
 define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 
 // 鉴权：与系统登录状态保持一致
-define('SESSION_EXPIRE', 86400);
-define('BIND_CLIENT_INFO', true);
+define('SESSION_IDLE_EXPIRE', 7200);
+define('SESSION_ABSOLUTE_EXPIRE', 604800);
+define('BIND_CLIENT_INFO', false);
 
 $baseCheck = isset($_SESSION['is_logged_in'])
     && $_SESSION['is_logged_in'] === true
     && isset($_SESSION['login_time'])
-    && (time() - $_SESSION['login_time']) < SESSION_EXPIRE;
+    && isset($_SESSION['last_activity'])
+    && (time() - $_SESSION['login_time']) < SESSION_ABSOLUTE_EXPIRE
+    && (time() - $_SESSION['last_activity']) < SESSION_IDLE_EXPIRE;
 
 if (!$baseCheck) {
     session_unset();
@@ -32,6 +35,8 @@ if (BIND_CLIENT_INFO) {
         exit;
     }
 }
+
+$_SESSION['last_activity'] = time();
 
 if ($_SERVER['REQUEST_METHOD'] !== 'POST') exit;
 
