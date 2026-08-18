@@ -4,37 +4,9 @@ header('Content-Type: application/json; charset=utf-8');
 
 define('ADMIN_PASSWORD_FILE', __DIR__ . '/../.admin_password');
 
-// 鉴权：与系统登录状态保持一致
-define('SESSION_IDLE_EXPIRE', 7200);
-define('SESSION_ABSOLUTE_EXPIRE', 604800);
-define('BIND_CLIENT_INFO', false);
-
-$baseCheck = isset($_SESSION['is_logged_in'])
-    && $_SESSION['is_logged_in'] === true
-    && isset($_SESSION['login_time'])
-    && isset($_SESSION['last_activity'])
-    && (time() - $_SESSION['login_time']) < SESSION_ABSOLUTE_EXPIRE
-    && (time() - $_SESSION['last_activity']) < SESSION_IDLE_EXPIRE;
-
-if (!$baseCheck) {
-    session_unset();
-    session_destroy();
-    http_response_code(401);
-    echo json_encode(['code'=>401,'message'=>'未授权或会话已过期'], JSON_UNESCAPED_UNICODE);
-    exit;
-}
-
-if (BIND_CLIENT_INFO) {
-    $sameIp = ($_SESSION['client_ip'] ?? '') === ($_SERVER['REMOTE_ADDR'] ?? '');
-    $sameUa = ($_SESSION['client_ua'] ?? '') === ($_SERVER['HTTP_USER_AGENT'] ?? '');
-    if (!$sameIp || !$sameUa) {
-        session_unset();
-        session_destroy();
-        http_response_code(401);
-        echo json_encode(['code'=>401,'message'=>'未授权或会话已失效'], JSON_UNESCAPED_UNICODE);
-        exit;
-    }
-}
+// 鉴权：与统一登录状态保持一致
+require_once __DIR__ . '/auth.php';
+require_login();
 
 $_SESSION['last_activity'] = time();
 
