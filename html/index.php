@@ -1,11 +1,5 @@
 <?php
 session_start();
-
-// 禁止浏览器缓存控制面板，确保登录状态失效后刷新不会继续显示旧页面
-header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
-header('Pragma: no-cache');
-header('Expires: 0');
-
 define('SESSION_EXPIRE', 86400);
 define('BIND_CLIENT_INFO', false); 
 
@@ -33,6 +27,62 @@ if (!isAuthorized()) {
     header('Location: /login.html', true, 302);
     exit;
 }
+
+// 活跃 TOKEN 趋势：当前自然月，按当月实际天数每天统计 HTTP 200 请求中的独立 TOKEN。
+// 仅用于趋势图，不改变现有日志统计、筛选或分页逻辑。
+$tokenTrendLabels = [];
+$tokenTrendValues = [];
+$tokenTrendDates = [];
+$trendToday = new DateTime('today', new DateTimeZone('Asia/Shanghai'));
+$trendMonthStart = new DateTime($trendToday->format('Y-m-01'), new DateTimeZone('Asia/Shanghai'));
+$trendMonthDays = (int)$trendMonthStart->format('t');
+for ($i = 0; $i < $trendMonthDays; $i++) {
+    $d = clone $trendMonthStart;
+    if ($i > 0) $d->modify('+' . $i . ' day');
+    $key = $d->format('Y-m-d');
+    $tokenTrendDates[] = $key;
+    $tokenTrendLabels[] = $d->format('n月j日');
+}
+$trendTokenSets = array_fill_keys($tokenTrendDates, []);
+$trendLogFile = '/opt/SubMonitor/rules/access.log';
+if (is_readable($trendLogFile)) {
+    $trendFp = @fopen($trendLogFile, 'r');
+    if ($trendFp) {
+        while (($trendLine = fgets($trendFp)) !== false) {
+            if (!preg_match('/^\S+ \S+ \S+ \[(.*?)\] "(?:GET|POST|HEAD) (\S+) HTTP\/[^\"]+" (\d{3}) /', $trendLine, $tm)) continue;
+            if ($tm[3] !== '200') continue;
+            $trendDt = DateTime::createFromFormat('d/M/Y:H:i:s O', $tm[1]);
+            if (!$trendDt) continue;
+            $trendDt->setTimezone(new DateTimeZone('Asia/Shanghai'));
+            $trendDay = $trendDt->format('Y-m-d');
+            if (!isset($trendTokenSets[$trendDay])) continue;
+
+            $trendParsed = parse_url($tm[2]);
+            $trendPath = $trendParsed['path'] ?? $tm[2];
+            $trendToken = '-';
+            $trendQuery = $trendParsed['query'] ?? '';
+            if ($trendQuery !== '') {
+                parse_str($trendQuery, $trendParams);
+                if (!empty($trendParams['token'])) $trendToken = $trendParams['token'];
+            }
+            if ($trendToken === '-' && $trendPath !== '/' && $trendPath !== '') {
+                $trendSegments = explode('/', trim($trendPath, '/'));
+                foreach ($trendSegments as $trendSeg) {
+                    if (strpos($trendSeg, '.') === false && strlen($trendSeg) >= 8 && !in_array($trendSeg, ['sub','api','static','admin','login'], true)) {
+                        $trendToken = $trendSeg;
+                        break;
+                    }
+                }
+            }
+            if ($trendToken !== '-' && $trendToken !== '') $trendTokenSets[$trendDay][$trendToken] = true;
+        }
+        fclose($trendFp);
+    }
+}
+foreach ($tokenTrendDates as $tokenTrendDate) {
+    $tokenTrendValues[] = isset($trendTokenSets[$tokenTrendDate]) ? count($trendTokenSets[$tokenTrendDate]) : 0;
+}
+unset($trendTokenSets);
 ?>
 <!DOCTYPE html>
 <html lang="zh-CN">
@@ -43,31 +93,6 @@ if (!isAuthorized()) {
     <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
     <meta http-equiv="Pragma" content="no-cache">
     <meta http-equiv="Expires" content="0">
-    <script>
-        // 登录状态失效时，刷新/加载控制面板立即返回登录页
-        (async function () {
-            try {
-                const res = await fetch('/api/check_status.php?_ts=' + Date.now(), {
-                    method: 'GET',
-                    cache: 'no-store',
-                    credentials: 'same-origin',
-                    headers: { 'Accept': 'application/json' }
-                });
-                if (res.status === 401) {
-                    window.location.replace('/login.html');
-                    return;
-                }
-                if (res.ok) {
-                    const data = await res.json().catch(() => null);
-                    if (data && (data.code === 401 || data.status === 401 || data.authenticated === false || data.logged_in === false)) {
-                        window.location.replace('/login.html');
-                    }
-                }
-            } catch (e) {
-                // 检查接口暂时不可用时不强制退出，避免网络抖动导致误跳转。
-            }
-        })();
-    </script>
     <title>SubMonitor - 订阅监控</title>
     
     <style>
@@ -1450,6 +1475,65 @@ if (!isAuthorized()) {
             display: none;
         }
 
+        .active-token-trend-card {
+            background: var(--card-bg);
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 16px;
+            margin-bottom: 16px;
+            box-shadow: 0 1px 2px rgba(15, 23, 42, 0.03);
+        }
+
+        .active-token-trend-header {
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+        }
+
+        .active-token-trend-title {
+            font-size: 0.95rem;
+            font-weight: 700;
+            color: var(--text-primary);
+        }
+
+        .active-token-trend-subtitle {
+            font-size: 0.72rem;
+            color: var(--text-muted);
+            white-space: nowrap;
+        }
+
+        .active-token-chart-wrap {
+            position: relative;
+            width: 100%;
+            height: 230px;
+        }
+
+        #active-token-trend-chart {
+            display: block;
+            width: 100%;
+            height: 100%;
+        }
+
+        @media (max-width: 768px) {
+            .active-token-trend-card {
+                padding: 12px;
+                border-radius: 10px;
+            }
+            .active-token-trend-header {
+                margin-bottom: 8px;
+            }
+            .active-token-trend-title {
+                font-size: 0.88rem;
+            }
+            .active-token-trend-subtitle {
+                font-size: 0.66rem;
+            }
+            .active-token-chart-wrap {
+                height: 190px;
+            }
+        }
 </style>
 </head>
 <body>
@@ -1489,6 +1573,15 @@ if (!isAuthorized()) {
             <div class="stat-card">
                 <div class="stat-label">异常率</div>
                 <div class="stat-number red" id="stat-error-rate">0%</div>
+            </div>
+        </div>
+
+        <div class="active-token-trend-card">
+            <div class="active-token-trend-header">
+                <span class="active-token-trend-title">活跃 TOKEN 趋势</span>
+                            </div>
+            <div class="active-token-chart-wrap">
+                <canvas id="active-token-trend-chart" aria-label="活跃 TOKEN 趋势图"></canvas>
             </div>
         </div>
 
@@ -1731,6 +1824,8 @@ if (!isAuthorized()) {
 
         document.addEventListener('DOMContentLoaded', () => {
             initializeApp();
+            renderActiveTokenTrendChart();
+            bindActiveTokenTrendTooltip();
         });
 
         function handleLogout() {
@@ -2633,6 +2728,120 @@ if (!isAuthorized()) {
             }
         }
 
+        const activeTokenTrendLabels = <?php echo json_encode($tokenTrendLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+        const activeTokenTrendValues = <?php echo json_encode($tokenTrendValues, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
+
+        function renderActiveTokenTrendChart() {
+            const canvas = document.getElementById('active-token-trend-chart');
+            if (!canvas) return;
+            const wrap = canvas.parentElement;
+            const rect = wrap.getBoundingClientRect();
+            const dpr = window.devicePixelRatio || 1;
+            const width = Math.max(320, Math.floor(rect.width));
+            const height = Math.max(160, Math.floor(rect.height));
+            canvas.width = Math.floor(width * dpr);
+            canvas.height = Math.floor(height * dpr);
+            canvas.style.width = width + 'px';
+            canvas.style.height = height + 'px';
+
+            const ctx = canvas.getContext('2d');
+            ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+            ctx.clearRect(0, 0, width, height);
+
+            const labels = Array.isArray(activeTokenTrendLabels) ? activeTokenTrendLabels : [];
+            const values = Array.isArray(activeTokenTrendValues) ? activeTokenTrendValues.map(v => Number(v) || 0) : [];
+            if (!labels.length || !values.length) return;
+
+            const left = 42, right = 12, top = 12, bottom = 34;
+            const plotW = Math.max(1, width - left - right);
+            const plotH = Math.max(1, height - top - bottom);
+            const maxValue = Math.max(1, ...values);
+            const yStep = maxValue <= 5 ? 1 : Math.ceil(maxValue / 5);
+            const yMax = Math.max(yStep * 5, maxValue);
+
+            ctx.font = '11px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif';
+            ctx.textBaseline = 'middle';
+            ctx.textAlign = 'right';
+            ctx.strokeStyle = '#e2e8f0';
+            ctx.fillStyle = '#64748b';
+            ctx.lineWidth = 1;
+
+            for (let i = 0; i <= 5; i++) {
+                const value = yMax * i / 5;
+                const y = top + plotH - (value / yMax) * plotH;
+                ctx.beginPath();
+                ctx.moveTo(left, y);
+                ctx.lineTo(width - right, y);
+                ctx.stroke();
+                ctx.fillText(String(Math.round(value)), left - 7, y);
+            }
+
+            const points = values.map((value, i) => {
+                const x = labels.length === 1 ? left + plotW / 2 : left + (i / (labels.length - 1)) * plotW;
+                const y = top + plotH - (value / yMax) * plotH;
+                return {x, y, value};
+            });
+
+            ctx.beginPath();
+            points.forEach((p, i) => i ? ctx.lineTo(p.x, p.y) : ctx.moveTo(p.x, p.y));
+            ctx.strokeStyle = '#16a34a';
+            ctx.lineWidth = 2;
+            // 转折处使用圆角连接，避免尖角像箭头一样从数据圆点外侧突出。
+            ctx.lineJoin = 'round';
+            ctx.lineCap = 'round';
+            ctx.stroke();
+
+            points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = '#16a34a';
+                ctx.fill();
+            });
+
+            ctx.fillStyle = '#64748b';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'top';
+            const labelStep = width <= 600 ? 5 : 3;
+            labels.forEach((label, i) => {
+                if (i % labelStep !== 0 && i !== labels.length - 1) return;
+                const x = points[i].x;
+                ctx.fillText(label, x, top + plotH + 8);
+            });
+
+            canvas._activeTokenTrendPoints = points;
+            canvas._activeTokenTrendLabels = labels;
+            canvas._activeTokenTrendValues = values;
+        }
+
+        function bindActiveTokenTrendTooltip() {
+            const canvas = document.getElementById('active-token-trend-chart');
+            if (!canvas || canvas.dataset.tooltipBound === '1') return;
+            canvas.dataset.tooltipBound = '1';
+
+            const tip = document.createElement('div');
+            tip.style.cssText = 'position:fixed;display:none;z-index:9999;padding:6px 9px;border-radius:7px;background:#0f172a;color:#fff;font-size:12px;pointer-events:none;white-space:nowrap;box-shadow:0 4px 12px rgba(0,0,0,.15);';
+            document.body.appendChild(tip);
+
+            canvas.addEventListener('mousemove', e => {
+                const points = canvas._activeTokenTrendPoints || [];
+                if (!points.length) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                let nearest = points[0], distance = Math.abs(x - points[0].x);
+                points.forEach(p => {
+                    const d = Math.abs(x - p.x);
+                    if (d < distance) { distance = d; nearest = p; }
+                });
+                if (distance > 16) { tip.style.display = 'none'; return; }
+                const idx = points.indexOf(nearest);
+                tip.textContent = `${canvas._activeTokenTrendLabels[idx]}：${nearest.value} 个活跃TOKEN`;
+                tip.style.display = 'block';
+                tip.style.left = Math.min(e.clientX + 12, window.innerWidth - tip.offsetWidth - 8) + 'px';
+                tip.style.top = Math.max(8, e.clientY - 38) + 'px';
+            });
+            canvas.addEventListener('mouseleave', () => { tip.style.display = 'none'; });
+        }
+
         function renderAnalyticsCards(analyticsData) {
             analyticsSourceData = {
                 topIp: Array.isArray(analyticsData?.top_ips) ? analyticsData.top_ips : [],
@@ -3101,6 +3310,7 @@ if (!isAuthorized()) {
         }
 
         window.addEventListener('resize', () => {
+            renderActiveTokenTrendChart();
             if (allLogs.length > 0) {
                 invalidateLogRequestState();
                 fetchData(true);
