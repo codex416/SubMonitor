@@ -1845,11 +1845,11 @@ unset($trendTokenSets);
                 <div class="analytics-list" id="list-top-token"></div>
             </div>
             <div class="analytics-card">
-                <div class="analytics-header"><span class="analytics-title">今日可疑 TOKEN (多IP拉取同一TOKEN)</span></div>
+                <div class="analytics-header"><span class="analytics-title">今日可疑 TOKEN</span></div>
                 <div class="analytics-list" id="list-sus-token"></div>
             </div>
             <div class="analytics-card">
-                <div class="analytics-header"><span class="analytics-title">今日可疑 IP (多TOKEN被同一IP拉取)</span></div>
+                <div class="analytics-header"><span class="analytics-title">今日可疑 IP</span></div>
                 <div class="analytics-list" id="list-sus-ip"></div>
             </div>
         </div>
@@ -1858,7 +1858,7 @@ unset($trendTokenSets);
 
         <div class="control-panel">
             <div class="control-row">
-                <input type="text" id="search" class="search-input" placeholder="搜索 IP、地区、Token、备注或 UA..." oninput="handleSearchInput()">
+                <input type="text" id="search" class="search-input" placeholder="搜索 IP、地区、Token、备注或 UA" oninput="handleSearchInput()">
                 <div class="btn-group">
                     <button class="btn" onclick="refreshLogData()">刷新数据</button>
                     <button class="btn" onclick="clearAllFilters()">重置所有</button>
@@ -1952,7 +1952,7 @@ unset($trendTokenSets);
                 <div style="background:#f8fafc; border:1px solid var(--border); border-radius:10px; padding:12px; display:flex; justify-content:space-between; align-items:center;">
                     <div>
                         <div style="font-size:0.85rem; font-weight:700; color:var(--text-primary);">黑名单规则管理</div>
-                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">管理 IP、Token、UA 黑名单及手动添加封禁</div>
+                        <div style="font-size:0.75rem; color:var(--text-muted); margin-top:2px;">添加封禁规则</div>
                     </div>
                     <button class="btn sys-btn-unified" onclick="openBlacklistModalFromSys()" style="color:var(--primary-red); border-color:#fecaca; background:#fef2f2;">黑名单</button>
                 </div>
