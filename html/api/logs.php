@@ -252,8 +252,15 @@ foreach ($allParsedLines as $item) {
         }
     }
 
-    // 可疑行为关联映射
-    if ($token && $token !== '-' && $ip && $ip !== '-') {
+    // 今日可疑行为关联映射
+    if (
+        $time !== '' &&
+        strpos($time, $todayStr) === 0 &&
+        $token &&
+        $token !== '-' &&
+        $ip &&
+        $ip !== '-'
+    ) {
         if (!isset($tokenIpMap[$token])) {
             $tokenIpMap[$token] = [];
         }
