@@ -66,8 +66,8 @@ $tokenTrendValues = [];
 $tokenTrendDates = [];
 $trendToday = new DateTime('today', new DateTimeZone('Asia/Shanghai'));
 $trendMonthStart = new DateTime($trendToday->format('Y-m-01'), new DateTimeZone('Asia/Shanghai'));
-$trendMonthDays = (int)$trendMonthStart->format('t');
-for ($i = 0; $i < $trendMonthDays; $i++) {
+$trendTodayDay = (int)$trendToday->format('j'); 
+for ($i = 0; $i < $trendTodayDay; $i++) {
     $d = clone $trendMonthStart;
     if ($i > 0) $d->modify('+' . $i . ' day');
     $key = $d->format('Y-m-d');
@@ -2988,6 +2988,7 @@ unset($trendTokenSets);
         const activeTokenTrendLabels = <?php echo json_encode($tokenTrendLabels, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
         const activeTokenTrendValues = <?php echo json_encode($tokenTrendValues, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES); ?>;
 
+        // [折线图修复 v2026-08-19-02] X轴首尾防挤压 + 移动端数据指针竖向虚线
         function renderActiveTokenTrendChart() {
             const canvas = document.getElementById('active-token-trend-chart');
             if (!canvas) return;
@@ -3000,6 +3001,7 @@ unset($trendTokenSets);
             canvas.height = Math.floor(height * dpr);
             canvas.style.width = width + 'px';
             canvas.style.height = height + 'px';
+            canvas.style.touchAction = 'pan-y';
 
             const ctx = canvas.getContext('2d');
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
@@ -3055,19 +3057,93 @@ unset($trendTokenSets);
                 ctx.fill();
             });
 
+            // X 轴日期：移动端竖屏优先保证首尾日期完整显示，
+            // 只有在实际文字宽度允许时才增加中间日期，避免最后一个日期被挤压。
             ctx.fillStyle = '#64748b';
-            ctx.textAlign = 'center';
             ctx.textBaseline = 'top';
-            const labelStep = width <= 600 ? 5 : 3;
-            labels.forEach((label, i) => {
-                if (i % labelStep !== 0 && i !== labels.length - 1) return;
-                const x = points[i].x;
-                ctx.fillText(label, x, top + plotH + 8);
+            const isNarrowMobile = window.matchMedia('(max-width: 480px) and (orientation: portrait)').matches;
+            const labelFontSize = isNarrowMobile ? 10 : 11;
+            ctx.font = `${labelFontSize}px -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif`;
+            const labelY = top + plotH + 8;
+            const labelGap = isNarrowMobile ? 12 : 16;
+
+            const labelItems = [];
+            const pushLabel = (i, align) => {
+                if (i < 0 || i >= labels.length) return;
+                const text = String(labels[i]);
+                const textWidth = ctx.measureText(text).width;
+                let x = points[i].x;
+                if (align === 'left') x = Math.max(left, x);
+                if (align === 'right') x = Math.min(width - right, x);
+                const boxLeft = align === 'left' ? x : align === 'right' ? x - textWidth : x - textWidth / 2;
+                const boxRight = align === 'left' ? x + textWidth : align === 'right' ? x : x + textWidth / 2;
+                labelItems.push({i, text, x, align, boxLeft, boxRight});
+            };
+
+            if (labels.length === 1) {
+                pushLabel(0, 'center');
+            } else {
+                // 首尾标签分别向内展开，确保最后一个日期不会被 Canvas 右边缘裁掉。
+                pushLabel(0, 'left');
+                pushLabel(labels.length - 1, 'right');
+
+                // 中间标签只在不与首尾标签发生碰撞时绘制。窄屏最多增加一个中间标签。
+                const maxMiddle = isNarrowMobile ? 1 : (width <= 600 ? 2 : Math.floor(labels.length / 4));
+                const candidates = [];
+                if (maxMiddle > 0) {
+                    const step = Math.max(1, Math.ceil((labels.length - 1) / (maxMiddle + 1)));
+                    for (let i = step; i < labels.length - 1 && candidates.length < maxMiddle; i += step) {
+                        candidates.push(i);
+                    }
+                }
+                candidates.forEach(i => {
+                    const text = String(labels[i]);
+                    const textWidth = ctx.measureText(text).width;
+                    const x = points[i].x;
+                    const item = {i, text, x, align: 'center', boxLeft: x - textWidth / 2, boxRight: x + textWidth / 2};
+                    if (labelItems.every(existing => item.boxRight + labelGap < existing.boxLeft || item.boxLeft - labelGap > existing.boxRight)) {
+                        labelItems.push(item);
+                    }
+                });
+            }
+
+            labelItems.sort((a, b) => a.i - b.i);
+            labelItems.forEach(item => {
+                ctx.textAlign = item.align;
+                ctx.fillText(item.text, item.x, labelY);
             });
+
+            // 移动端数据指针：必须在每次完整重绘的最后阶段绘制，避免重绘 Canvas 后竖向虚线消失。
+            // 这是最终绘制层，不参与统计数据和折线计算。
+            const selectedIndex = Number.isInteger(canvas._activeTokenTrendSelectedIndex)
+                ? canvas._activeTokenTrendSelectedIndex : -1;
+            if (selectedIndex >= 0 && selectedIndex < points.length) {
+                const selectedPoint = points[selectedIndex];
+                ctx.save();
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(100, 116, 139, 0.72)';
+                ctx.lineWidth = 1;
+                ctx.moveTo(selectedPoint.x, top);
+                ctx.lineTo(selectedPoint.x, top + plotH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                ctx.beginPath();
+                ctx.arc(selectedPoint.x, selectedPoint.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(selectedPoint.x, selectedPoint.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#16a34a';
+                ctx.fill();
+                ctx.restore();
+            }
 
             canvas._activeTokenTrendPoints = points;
             canvas._activeTokenTrendLabels = labels;
             canvas._activeTokenTrendValues = values;
+            canvas._activeTokenTrendPlot = {top, plotH, width, height, dpr};
         }
 
         function bindActiveTokenTrendTooltip() {
@@ -3106,51 +3182,134 @@ unset($trendTokenSets);
             });
 
             // 点击趋势图数据点后固定显示详细信息。
-            // 再点击图表外的任意位置时关闭，移动端/横屏触摸操作同样适用。
-            canvas.addEventListener('click', e => {
+            // 移动端采用“滑动数据指针”：横向滑动选择数据点，纵向手势交给页面滚动。
+            const hideTip = () => {
+                tip.style.display = 'none';
+                canvas._activeTokenTrendTipPinned = false;
+                canvas._activeTokenTrendTouching = false;
+                // 清除当前数据指针/竖向虚线，恢复基础折线图。
+                canvas._activeTokenTrendSelectedIndex = -1;
+                if (canvas._activeTokenTrendGuideVisible) {
+                    canvas._activeTokenTrendGuideVisible = false;
+                    renderActiveTokenTrendChart();
+                }
+            };
+
+            const drawGuide = (point) => {
+                const plot = canvas._activeTokenTrendPlot;
+                if (!plot || !point) return;
+                const ctx = canvas.getContext('2d');
+                ctx.save();
+                // 当前 canvas 已经使用 dpr 坐标变换，因此这里继续使用 CSS 像素坐标绘制。
+                ctx.setTransform(plot.dpr, 0, 0, plot.dpr, 0, 0);
+                ctx.beginPath();
+                ctx.setLineDash([4, 4]);
+                ctx.strokeStyle = 'rgba(100, 116, 139, 0.72)';
+                ctx.lineWidth = 1;
+                ctx.moveTo(point.x, plot.top);
+                ctx.lineTo(point.x, plot.top + plot.plotH);
+                ctx.stroke();
+                ctx.setLineDash([]);
+
+                // 当前数据点高亮，方便手指确认吸附到了哪一个点。
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 5, 0, Math.PI * 2);
+                ctx.fillStyle = '#ffffff';
+                ctx.fill();
+                ctx.beginPath();
+                ctx.arc(point.x, point.y, 4, 0, Math.PI * 2);
+                ctx.fillStyle = '#16a34a';
+                ctx.fill();
+                ctx.restore();
+                canvas._activeTokenTrendGuideVisible = true;
+            };
+
+            const showPoint = (clientX, clientY, pinned = false) => {
                 const points = canvas._activeTokenTrendPoints || [];
                 if (!points.length) return;
-
                 const rect = canvas.getBoundingClientRect();
-                const x = e.clientX - rect.left;
+                const x = Math.max(0, Math.min(rect.width, clientX - rect.left));
                 let nearest = points[0];
                 let distance = Math.abs(x - points[0].x);
-
                 points.forEach(p => {
                     const d = Math.abs(x - p.x);
-                    if (d < distance) {
-                        distance = d;
-                        nearest = p;
-                    }
+                    if (d < distance) { distance = d; nearest = p; }
                 });
-
-                if (distance > 20) {
-                    tip.style.display = 'none';
-                    return;
-                }
-
                 const idx = points.indexOf(nearest);
                 tip.textContent = `${canvas._activeTokenTrendLabels[idx]}：${nearest.value} 个活跃TOKEN`;
                 tip.style.display = 'block';
+                tip.style.left = Math.max(8, Math.min(clientX + 12, window.innerWidth - tip.offsetWidth - 8)) + 'px';
+                tip.style.top = Math.max(8, clientY - 38) + 'px';
+                canvas._activeTokenTrendSelectedIndex = idx;
+                canvas._activeTokenTrendTipPinned = pinned;
 
-                const tipLeft = Math.min(
-                    e.clientX + 12,
-                    window.innerWidth - tip.offsetWidth - 8
-                );
-                const tipTop = Math.max(8, e.clientY - 38);
+                // 将当前点交给完整重绘流程，由 renderActiveTokenTrendChart() 在最后一层绘制竖向虚线。
+                canvas._activeTokenTrendSelectedIndex = idx;
+                canvas._activeTokenTrendGuideVisible = true;
+                renderActiveTokenTrendChart();
+            };
 
-                tip.style.left = Math.max(8, tipLeft) + 'px';
-                tip.style.top = tipTop + 'px';
-
-                // 标记为点击固定状态，避免 mousemove 在桌面端立即覆盖/隐藏。
-                canvas._activeTokenTrendTipPinned = true;
+            canvas.addEventListener('click', e => {
+                if (window.matchMedia('(pointer: coarse)').matches) return;
+                const points = canvas._activeTokenTrendPoints || [];
+                if (!points.length) return;
+                const rect = canvas.getBoundingClientRect();
+                const x = e.clientX - rect.left;
+                let nearest = points[0], distance = Math.abs(x - points[0].x);
+                points.forEach(p => {
+                    const d = Math.abs(x - p.x);
+                    if (d < distance) { distance = d; nearest = p; }
+                });
+                if (distance > 20) { hideTip(); return; }
+                showPoint(e.clientX, e.clientY, true);
             });
 
-            // 点击图表以外的任意地方，关闭已经点击显示的趋势详情。
+            let touchStartX = 0;
+            let touchStartY = 0;
+            let touchMode = null;
+            canvas.addEventListener('touchstart', e => {
+                if (!e.touches.length) return;
+                const t = e.touches[0];
+                touchStartX = t.clientX;
+                touchStartY = t.clientY;
+                touchMode = null;
+                canvas._activeTokenTrendTouching = true;
+            }, {passive: true});
+
+            canvas.addEventListener('touchmove', e => {
+                if (!e.touches.length) return;
+                const t = e.touches[0];
+                const dx = t.clientX - touchStartX;
+                const dy = t.clientY - touchStartY;
+                if (!touchMode && (Math.abs(dx) > 6 || Math.abs(dy) > 6)) {
+                    touchMode = Math.abs(dx) > Math.abs(dy) ? 'horizontal' : 'vertical';
+                }
+                if (touchMode === 'horizontal') {
+                    // 只有确定为横向手势后才阻止默认行为，页面纵向滚动不会被锁住。
+                    e.preventDefault();
+                    showPoint(t.clientX, t.clientY, true);
+                }
+            }, {passive: false});
+
+            canvas.addEventListener('touchend', e => {
+                if (touchMode === 'vertical') {
+                    hideTip();
+                }
+                touchMode = null;
+                canvas._activeTokenTrendTouching = false;
+            }, {passive: true});
+
+            canvas.addEventListener('touchcancel', hideTip, {passive: true});
+
+            // 页面发生纵向滚动时取消固定提示，避免提示框像“粘”在屏幕上。
+            window.addEventListener('scroll', () => {
+                if (canvas._activeTokenTrendTouching) return;
+                if (canvas._activeTokenTrendTipPinned && window.matchMedia('(pointer: coarse)').matches) hideTip();
+            }, {passive: true});
+
             document.addEventListener('click', e => {
                 if (e.target === canvas || canvas.contains(e.target)) return;
-                tip.style.display = 'none';
-                canvas._activeTokenTrendTipPinned = false;
+                hideTip();
             });
         }
 
